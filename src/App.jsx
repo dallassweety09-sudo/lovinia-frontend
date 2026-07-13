@@ -3,7 +3,7 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
-const API_BASE = "";
+const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
 const PROFILES = [
   { id: 1, name: "Aïcha", age: 24, city: "Douala", genre: "Femme", bio: "Passionnée de danse et de bons plats. Toujours partante pour une nouvelle aventure.", tags: ["Danse", "Cuisine", "Voyages"], img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop" },
