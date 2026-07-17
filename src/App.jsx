@@ -5,6 +5,7 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
 const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
+
 const PROFILES = [
   { id: 1, name: "Aïcha", age: 24, city: "Douala", genre: "Femme", bio: "Passionnée de danse et de bons plats. Toujours partante pour une nouvelle aventure.", tags: ["Danse", "Cuisine", "Voyages"], img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop" },
   { id: 2, name: "Yannis", age: 27, city: "Douala", genre: "Homme", bio: "Entrepreneur le jour, guitariste la nuit. J'aime les longues discussions et le café noir.", tags: ["Musique", "Business", "Café"], img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&h=800&fit=crop" },
