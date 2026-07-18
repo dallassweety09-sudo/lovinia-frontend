@@ -5,6 +5,7 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
 const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
+
 // CLOUDINARY : pour l'upload réel de photos de profil depuis le téléphone.
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
 const CLOUDINARY_CLOUD_NAME = "";
