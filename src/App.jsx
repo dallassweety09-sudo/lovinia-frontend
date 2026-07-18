@@ -9,6 +9,7 @@ const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
 const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
 const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
+
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -704,10 +705,14 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       <span style={{ fontFamily: "Fraunces, serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mon profil</span>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 20 }}>
         <div style={{
-          width: 96, height: 96, borderRadius: "50%", background: "#3A2645",
+          width: 96, height: 96, borderRadius: "50%", background: "#3A2645", overflow: "hidden",
           display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #FF6B5B",
         }}>
-          <User size={40} color="#F2B84B" />
+          {photos[0] ? (
+            <img src={photos[0]} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <User size={40} color="#F2B84B" />
+          )}
         </div>
         <input value={name} onChange={(e) => setName(e.target.value)} style={{
           background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)",
@@ -849,6 +854,7 @@ function PhotoUploader({ photos, onChange }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [manualUrl, setManualUrl] = useState("");
+  const [viewerUrl, setViewerUrl] = useState(null);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -878,7 +884,17 @@ function PhotoUploader({ photos, onChange }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {photos.map((url, i) => (
           <div key={i} style={{ position: "relative", aspectRatio: "3/4", borderRadius: 12, overflow: "hidden" }}>
-            <img src={url} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img
+              src={url} alt={`Photo ${i + 1}`}
+              onClick={() => setViewerUrl(url)}
+              style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }}
+            />
+            {i === 0 && (
+              <span style={{
+                position: "absolute", bottom: 4, left: 4, background: "rgba(27,18,35,0.75)",
+                color: "#F2B84B", fontSize: 9.5, fontWeight: 600, padding: "2px 6px", borderRadius: 6,
+              }}>Principale</span>
+            )}
             <button type="button" onClick={() => onChange(photos.filter((_, idx) => idx !== i))} style={{
               position: "absolute", top: 4, right: 4, background: "rgba(27,18,35,0.8)", border: "none",
               borderRadius: "50%", width: 22, height: 22, color: "#FBEFE9", cursor: "pointer", display: "flex",
@@ -911,6 +927,23 @@ function PhotoUploader({ photos, onChange }) {
       )}
       {uploadError && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 8 }}>{uploadError}</p>}
       <p style={{ color: "#8C7A94", fontSize: 11.5, marginTop: 10 }}>{photos.length}/2 photos minimum</p>
+
+      {viewerUrl && (
+        <div
+          onClick={() => setViewerUrl(null)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out",
+          }}
+        >
+          <button onClick={() => setViewerUrl(null)} style={{
+            position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.12)", border: "none",
+            borderRadius: "50%", width: 36, height: 36, color: "#FBEFE9", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}><X size={18} /></button>
+          <img src={viewerUrl} alt="Photo agrandie" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12, objectFit: "contain" }} />
+        </div>
+      )}
     </div>
   );
 }
