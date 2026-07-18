@@ -3,7 +3,7 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
-const API_BASE = "";
+const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
 const INTENTIONS = [
   { value: "❤️ Relation sérieuse", emoji: "❤️", label: "Relation sérieuse" },
