@@ -8,8 +8,8 @@ const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
 // CLOUDINARY : pour l'upload réel de photos de profil depuis le téléphone.
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
-const CLOUDINARY_CLOUD_NAME = "";
-const CLOUDINARY_UPLOAD_PRESET = "";
+const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
+const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
