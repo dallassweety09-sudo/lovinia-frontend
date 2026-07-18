@@ -5,12 +5,10 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
 const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
-
 // CLOUDINARY : pour l'upload réel de photos de profil depuis le téléphone.
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
 const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
 const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
-
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -63,6 +61,12 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
   const cardRef = useRef(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const start = useRef({ x: 0, y: 0 });
+  const photos = (profile.photos && profile.photos.length) ? profile.photos : (profile.img ? [profile.img] : []);
+  const [photoIndex, setPhotoIndex] = useState(0);
+
+  useEffect(() => { setPhotoIndex(0); }, [profile.id]);
+
+  const currentPhoto = photos[Math.min(photoIndex, photos.length - 1)] || profile.img;
 
   const handleDown = (clientX, clientY) => {
     if (!isTop) return;
@@ -75,6 +79,17 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
   };
   const handleUp = () => {
     if (!isTop) return;
+    const isTap = Math.abs(drag.x) < 8 && Math.abs(drag.y) < 8;
+    if (isTap && photos.length > 1) {
+      const rect = cardRef.current?.getBoundingClientRect();
+      if (rect) {
+        const tapX = start.current.x - rect.left;
+        if (tapX < rect.width / 2) setPhotoIndex((i) => Math.max(0, i - 1));
+        else setPhotoIndex((i) => Math.min(photos.length - 1, i + 1));
+      }
+      setDrag({ x: 0, y: 0, active: false });
+      return;
+    }
     if (drag.x > 120) onSwipe("like");
     else if (drag.x < -120) onSwipe("pass");
     else setDrag({ x: 0, y: 0, active: false });
@@ -109,15 +124,25 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
         touchAction: "none",
       }}
     >
-      <img src={profile.img} alt={profile.name} draggable={false}
+      <img src={currentPhoto} alt={profile.name} draggable={false}
         style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
       <div style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(to top, rgba(27,18,35,0.92) 0%, rgba(27,18,35,0.35) 45%, rgba(27,18,35,0) 65%)",
       }} />
+      {photos.length > 1 && (
+        <div style={{ position: "absolute", top: 10, left: 10, right: 10, display: "flex", gap: 4 }}>
+          {photos.map((_, i) => (
+            <div key={i} style={{
+              flex: 1, height: 3, borderRadius: 2,
+              background: i === photoIndex ? "#FBEFE9" : "rgba(255,255,255,0.35)",
+            }} />
+          ))}
+        </div>
+      )}
       {profile.intention ? (
         <div style={{
-          position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)",
+          position: "absolute", top: photos.length > 1 ? 24 : 16, left: "50%", transform: "translateX(-50%)",
           background: "rgba(27,18,35,0.75)", border: "1px solid rgba(255,255,255,0.2)",
           borderRadius: 999, padding: "5px 14px", color: "#FBEFE9", fontSize: 12, fontWeight: 600,
           backdropFilter: "blur(4px)", whiteSpace: "nowrap",
@@ -597,12 +622,17 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
   );
 }
 
-function ProfileScreen({ user, onLogout }) {
+function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [name, setName] = useState(user?.name || "Toi");
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
   const [intention, setIntention] = useState("");
+  const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!API_BASE) return;
@@ -615,6 +645,7 @@ function ProfileScreen({ user, onLogout }) {
           setName(data.user.name || "");
           setBio(data.user.bio || "Ajoute une bio pour te présenter.");
           setIntention(data.user.intention || "");
+          setPhotos(data.user.photos || []);
         }
       } catch {
         // Silencieux : on garde les valeurs par défaut si le chargement échoue.
@@ -631,7 +662,7 @@ function ProfileScreen({ user, onLogout }) {
         await fetch(`${API_BASE}/api/me`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name, bio, intention }),
+          body: JSON.stringify({ name, bio, intention, photos }),
         });
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
@@ -640,6 +671,32 @@ function ProfileScreen({ user, onLogout }) {
       }
     }
     setSaving(false);
+  };
+
+  const deleteAccount = async () => {
+    setDeleteError("");
+    setDeleting(true);
+    if (API_BASE) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/me`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ password: deletePassword }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Impossible de supprimer le compte.");
+        localStorage.removeItem("token");
+        onAccountDeleted();
+      } catch (e) {
+        setDeleteError(e.message || "Une erreur est survenue.");
+        setDeleting(false);
+        return;
+      }
+    } else {
+      onAccountDeleted();
+    }
+    setDeleting(false);
   };
 
   return (
@@ -659,6 +716,13 @@ function ProfileScreen({ user, onLogout }) {
         }} />
       </div>
       <div style={{ marginTop: 24 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes photos</label>
+        <div style={{ marginTop: 8 }}>
+          <PhotoUploader photos={photos} onChange={setPhotos} />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Bio</label>
         <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} style={{
           width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
@@ -691,7 +755,7 @@ function ProfileScreen({ user, onLogout }) {
 
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <p style={{ color: "#D8C4D0", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          Version MVP — la vérification photo et les paramètres de confidentialité avancés arrivent dans une prochaine itération.
+          L'ajout de photos est disponible dès maintenant. Le badge de vérification d'identité (selfie) et les paramètres de confidentialité avancés arrivent dans une prochaine itération.
         </p>
       </div>
 
@@ -699,6 +763,40 @@ function ProfileScreen({ user, onLogout }) {
         marginTop: 16, width: "100%", padding: "12px 0", borderRadius: 14, cursor: "pointer",
         background: "rgba(255,255,255,0.06)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 14,
       }}>Se déconnecter</button>
+
+      {!confirmDelete ? (
+        <button onClick={() => setConfirmDelete(true)} style={{
+          marginTop: 10, marginBottom: 24, width: "100%", padding: "12px 0", borderRadius: 14, cursor: "pointer",
+          background: "none", color: "#6B5A73", border: "none", fontSize: 13, textDecoration: "underline",
+        }}>Supprimer mon compte</button>
+      ) : (
+        <div style={{ marginTop: 14, marginBottom: 24, background: "rgba(255,107,91,0.08)", border: "1px solid rgba(255,107,91,0.3)", borderRadius: 14, padding: 16 }}>
+          <p style={{ color: "#FBEFE9", fontSize: 13.5, fontWeight: 600, margin: 0 }}>Supprimer définitivement ton compte ?</p>
+          <p style={{ color: "#D8C4D0", fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+            Cette action est irréversible : ton profil, tes matchs et tes messages seront effacés.
+          </p>
+          {API_BASE && (
+            <div style={{ ...fieldWrap, marginTop: 10 }}>
+              <Lock size={14} color="#8C7A94" />
+              <input
+                type="password" placeholder="Confirme ton mot de passe" value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)} style={fieldInput}
+              />
+            </div>
+          )}
+          {deleteError && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 8 }}>{deleteError}</p>}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={() => { setConfirmDelete(false); setDeleteError(""); setDeletePassword(""); }} style={{
+              flex: 1, padding: "10px 0", borderRadius: 12, cursor: "pointer",
+              background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13,
+            }}>Annuler</button>
+            <button onClick={deleteAccount} disabled={deleting} style={{
+              flex: 1, padding: "10px 0", borderRadius: 12, cursor: deleting ? "default" : "pointer",
+              background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 13, fontWeight: 600, opacity: deleting ? 0.7 : 1,
+            }}>{deleting ? "Suppression..." : "Confirmer"}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1103,7 +1201,7 @@ export default function DatingAppMVP() {
             {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} />}
             {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
-            {tab === "profile" && <ProfileScreen user={user} onLogout={() => setUser(null)} />}
+            {tab === "profile" && <ProfileScreen user={user} onLogout={() => setUser(null)} onAccountDeleted={() => setUser(null)} />}
           </div>
           <div style={{
             display: "flex", justifyContent: "space-around", padding: "10px 8px 16px",
