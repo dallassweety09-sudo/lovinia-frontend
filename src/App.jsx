@@ -3,15 +3,23 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
-const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
+const API_BASE = "";
 
+const INTENTIONS = [
+  { value: "❤️ Relation sérieuse", emoji: "❤️", label: "Relation sérieuse" },
+  { value: "💕 Rencontres sans prise de tête", emoji: "💕", label: "Sans prise de tête" },
+  { value: "🍷 Prendre un verre", emoji: "🍷", label: "Prendre un verre" },
+  { value: "🌙 Coup d'un soir", emoji: "🌙", label: "Coup d'un soir" },
+  { value: "💬 Discuter et se faire des amis", emoji: "💬", label: "Discuter, amis" },
+  { value: "✈️ Recherche de partenaire de voyage", emoji: "✈️", label: "Partenaire de voyage" },
+];
 
 const PROFILES = [
-  { id: 1, name: "Aïcha", age: 24, city: "Douala", genre: "Femme", bio: "Passionnée de danse et de bons plats. Toujours partante pour une nouvelle aventure.", tags: ["Danse", "Cuisine", "Voyages"], img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop" },
-  { id: 2, name: "Yannis", age: 27, city: "Douala", genre: "Homme", bio: "Entrepreneur le jour, guitariste la nuit. J'aime les longues discussions et le café noir.", tags: ["Musique", "Business", "Café"], img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&h=800&fit=crop" },
-  { id: 3, name: "Nina", age: 23, city: "Douala", genre: "Femme", bio: "Étudiante en art, amoureuse des couchers de soleil et des vieux films.", tags: ["Art", "Cinéma", "Photo"], img: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=600&h=800&fit=crop" },
-  { id: 4, name: "Dina", age: 29, city: "Douala", genre: "Femme", bio: "Sportive, drôle, et un peu trop compétitive au Ludo. Cherche quelqu'un qui suit le rythme.", tags: ["Fitness", "Humour", "Sport"], img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&h=800&fit=crop" },
-  { id: 5, name: "Malik", age: 26, city: "Douala", genre: "Homme", bio: "Ingénieur le jour, chef amateur le soir. Toujours un nouveau plat à tester.", tags: ["Tech", "Cuisine", "Nature"], img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&h=800&fit=crop" },
+  { id: 1, name: "Aïcha", age: 24, city: "Douala", genre: "Femme", intention: INTENTIONS[0].value, bio: "Passionnée de danse et de bons plats. Toujours partante pour une nouvelle aventure.", tags: ["Danse", "Cuisine", "Voyages"], img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop" },
+  { id: 2, name: "Yannis", age: 27, city: "Douala", genre: "Homme", intention: INTENTIONS[2].value, bio: "Entrepreneur le jour, guitariste la nuit. J'aime les longues discussions et le café noir.", tags: ["Musique", "Business", "Café"], img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&h=800&fit=crop" },
+  { id: 3, name: "Nina", age: 23, city: "Douala", genre: "Femme", intention: INTENTIONS[4].value, bio: "Étudiante en art, amoureuse des couchers de soleil et des vieux films.", tags: ["Art", "Cinéma", "Photo"], img: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=600&h=800&fit=crop" },
+  { id: 4, name: "Dina", age: 29, city: "Douala", genre: "Femme", intention: INTENTIONS[1].value, bio: "Sportive, drôle, et un peu trop compétitive au Ludo. Cherche quelqu'un qui suit le rythme.", tags: ["Fitness", "Humour", "Sport"], img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&h=800&fit=crop" },
+  { id: 5, name: "Malik", age: 26, city: "Douala", genre: "Homme", intention: INTENTIONS[5].value, bio: "Ingénieur le jour, chef amateur le soir. Toujours un nouveau plat à tester.", tags: ["Tech", "Cuisine", "Nature"], img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&h=800&fit=crop" },
 ];
 
 const CONVERSATIONS = [
@@ -85,6 +93,14 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
         position: "absolute", inset: 0,
         background: "linear-gradient(to top, rgba(27,18,35,0.92) 0%, rgba(27,18,35,0.35) 45%, rgba(27,18,35,0) 65%)",
       }} />
+      {profile.intention ? (
+        <div style={{
+          position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(27,18,35,0.75)", border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: 999, padding: "5px 14px", color: "#FBEFE9", fontSize: 12, fontWeight: 600,
+          backdropFilter: "blur(4px)", whiteSpace: "nowrap",
+        }}>{profile.intention}</div>
+      ) : null}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "20px 22px" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
@@ -118,14 +134,14 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
   );
 }
 
-const DEFAULT_FILTERS = { genre: "Tous", ageMin: 18, ageMax: 45, distance: 50 };
+const DEFAULT_FILTERS = { genre: "Tous", ageMin: 18, ageMax: 45, distance: 50, intention: "Toutes" };
 
 function FiltersPanel({ filters, onChange, onClose }) {
   const set = (key, val) => onChange({ ...filters, [key]: val });
   return (
     <div style={{
       position: "absolute", inset: 0, background: "rgba(27,18,35,0.97)", zIndex: 40,
-      padding: "20px 20px 0", display: "flex", flexDirection: "column",
+      padding: "20px 20px 0", display: "flex", flexDirection: "column", overflowY: "auto",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
         <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#FBEFE9", fontWeight: 600 }}>Filtres</span>
@@ -143,6 +159,24 @@ function FiltersPanel({ filters, onChange, onClose }) {
               background: filters.genre === g ? "#FF6B5B" : "rgba(255,255,255,0.08)",
               color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13,
             }}>{g}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 22 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Type de rencontre</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+          <button onClick={() => set("intention", "Toutes")} style={{
+            padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+            background: filters.intention === "Toutes" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+            color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+          }}>Toutes</button>
+          {INTENTIONS.map((it) => (
+            <button key={it.value} onClick={() => set("intention", it.value)} style={{
+              padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+              background: filters.intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+              color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+            }}>{it.emoji} {it.label}</button>
           ))}
         </div>
       </div>
@@ -192,7 +226,7 @@ function DiscoverScreen({ onNewMatch }) {
     if (API_BASE) {
       try {
         const token = localStorage.getItem("token");
-        const params = new URLSearchParams({ genre: f.genre, ageMin: f.ageMin, ageMax: f.ageMax });
+        const params = new URLSearchParams({ genre: f.genre, ageMin: f.ageMin, ageMax: f.ageMax, intention: f.intention || "Toutes" });
         const res = await fetch(`${API_BASE}/api/discover?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -206,7 +240,8 @@ function DiscoverScreen({ onNewMatch }) {
     } else {
       // Mode démo : pas de backend, on filtre les faux profils locaux.
       const next = PROFILES.filter((p) =>
-        (f.genre === "Tous" || p.genre === f.genre) && p.age >= f.ageMin && p.age <= f.ageMax
+        (f.genre === "Tous" || p.genre === f.genre) && p.age >= f.ageMin && p.age <= f.ageMax &&
+        (!f.intention || f.intention === "Toutes" || p.intention === f.intention)
       );
       setDeck(next);
     }
@@ -543,6 +578,48 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
 function ProfileScreen({ user, onLogout }) {
   const [name, setName] = useState(user?.name || "Toi");
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
+  const [intention, setIntention] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!API_BASE) return;
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (data.user) {
+          setName(data.user.name || "");
+          setBio(data.user.bio || "Ajoute une bio pour te présenter.");
+          setIntention(data.user.intention || "");
+        }
+      } catch {
+        // Silencieux : on garde les valeurs par défaut si le chargement échoue.
+      }
+    })();
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    if (API_BASE) {
+      try {
+        const token = localStorage.getItem("token");
+        await fetch(`${API_BASE}/api/me`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ name, bio, intention }),
+        });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch {
+        // Silencieux : l'utilisateur peut réessayer.
+      }
+    }
+    setSaving(false);
+  };
+
   return (
     <div style={{ padding: "18px 18px 0" }}>
       <span style={{ fontFamily: "Fraunces, serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mon profil</span>
@@ -566,6 +643,30 @@ function ProfileScreen({ user, onLogout }) {
           borderRadius: 12, color: "#FBEFE9", fontSize: 14, padding: 12, outline: "none", resize: "none", boxSizing: "border-box",
         }} />
       </div>
+
+      <div style={{ marginTop: 20 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Je recherche</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+          {INTENTIONS.map((it) => (
+            <button key={it.value} onClick={() => setIntention(it.value)} style={{
+              padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+              background: intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+              color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+            }}>{it.emoji} {it.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {API_BASE && (
+        <button onClick={save} disabled={saving} style={{
+          marginTop: 20, width: "100%", padding: "12px 0", borderRadius: 14, cursor: saving ? "default" : "pointer",
+          background: saved ? "#6BE0A8" : "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 14, fontWeight: 600,
+          opacity: saving ? 0.7 : 1,
+        }}>
+          {saving ? "Enregistrement..." : saved ? "Enregistré ✓" : "Enregistrer les modifications"}
+        </button>
+      )}
+
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <p style={{ color: "#D8C4D0", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
           Version MVP — la vérification photo et les paramètres de confidentialité avancés arrivent dans une prochaine itération.
@@ -582,7 +683,7 @@ function ProfileScreen({ user, onLogout }) {
 
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("register"); // "register" | "login"
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", intention: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -592,6 +693,10 @@ function AuthScreen({ onAuth }) {
     setError("");
     if (!form.email || !form.password || (mode === "register" && !form.name)) {
       setError("Merci de remplir tous les champs.");
+      return;
+    }
+    if (mode === "register" && !form.intention) {
+      setError("Choisis ce que tu recherches sur Lovinia pour continuer.");
       return;
     }
     setLoading(true);
@@ -656,6 +761,30 @@ function AuthScreen({ onAuth }) {
           <input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} />
         </div>
       </div>
+
+      {mode === "register" && (
+        <div style={{ marginTop: 14, marginBottom: 4 }}>
+          <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Tu recherches...
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            {INTENTIONS.map((it) => (
+              <button
+                key={it.value}
+                type="button"
+                onClick={() => set("intention", it.value)}
+                style={{
+                  padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+                  background: form.intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                  color: "#FBEFE9", border: form.intention === it.value ? "1px solid #FF6B5B" : "1px solid rgba(255,255,255,0.14)",
+                }}
+              >
+                {it.emoji} {it.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && <p style={{ color: "#FF6B5B", fontSize: 12, margin: "8px 0 0" }}>{error}</p>}
 
