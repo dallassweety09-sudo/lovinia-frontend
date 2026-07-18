@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -9,7 +9,6 @@ const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
 const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
 const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
-
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -153,6 +152,7 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
+          {profile.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
           <MapPin size={13} /> {profile.city}{profile.profession ? ` · ${profile.profession}` : ""}
@@ -628,12 +628,16 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
   const [intention, setIntention] = useState("");
   const [photos, setPhotos] = useState([]);
+  const [verificationStatus, setVerificationStatus] = useState("none");
+  const [verifUploading, setVerifUploading] = useState(false);
+  const [verifError, setVerifError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const verifInputRef = useRef(null);
 
   useEffect(() => {
     if (!API_BASE) return;
@@ -647,12 +651,37 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setBio(data.user.bio || "Ajoute une bio pour te présenter.");
           setIntention(data.user.intention || "");
           setPhotos(data.user.photos || []);
+          setVerificationStatus(data.user.verification_status || "none");
         }
       } catch {
         // Silencieux : on garde les valeurs par défaut si le chargement échoue.
       }
     })();
   }, []);
+
+  const submitSelfie = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVerifError("");
+    setVerifUploading(true);
+    try {
+      const url = await uploadPhotoToCloudinary(file);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/verification/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ selfieUrl: url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'envoi.");
+      setVerificationStatus("pending");
+    } catch (err) {
+      setVerifError(err.message || "Échec de l'envoi du selfie.");
+    } finally {
+      setVerifUploading(false);
+      if (verifInputRef.current) verifInputRef.current.value = "";
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -719,6 +748,55 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, textAlign: "center",
           marginTop: 14, padding: "4px 0", outline: "none", width: 200,
         }} />
+        {verificationStatus === "verified" && (
+          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#4FA8FF", fontSize: 12.5, marginTop: 6 }}>
+            <BadgeCheck size={15} /> Profil vérifié
+          </span>
+        )}
+      </div>
+
+      <div style={{ marginTop: 22, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <BadgeCheck size={17} color={verificationStatus === "verified" ? "#4FA8FF" : "#8C7A94"} />
+          <span style={{ color: "#FBEFE9", fontSize: 14, fontWeight: 600 }}>Badge de vérification</span>
+        </div>
+
+        {verificationStatus === "verified" && (
+          <p style={{ color: "#4FA8FF", fontSize: 13, marginTop: 8 }}>Ton profil est vérifié ✓</p>
+        )}
+        {verificationStatus === "pending" && (
+          <p style={{ color: "#F2B84B", fontSize: 13, marginTop: 8 }}>Ton selfie est en cours d'examen. On te tiendra au courant !</p>
+        )}
+        {(verificationStatus === "none" || verificationStatus === "rejected") && (
+          <>
+            {verificationStatus === "rejected" && (
+              <p style={{ color: "#FF6B5B", fontSize: 12.5, marginTop: 8 }}>Ta précédente demande n'a pas été validée. Réessaie avec un selfie plus net.</p>
+            )}
+            <p style={{ color: "#D8C4D0", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
+              Prends un selfie en direct pour demander le badge bleu et rassurer les autres membres.
+            </p>
+            <button
+              type="button"
+              onClick={() => verifInputRef.current?.click()}
+              disabled={verifUploading || !API_BASE}
+              style={{
+                marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                width: "100%", padding: "11px 0", borderRadius: 12, cursor: verifUploading ? "default" : "pointer",
+                background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)",
+                fontSize: 13.5, fontWeight: 600, opacity: verifUploading ? 0.7 : 1,
+              }}
+            >
+              <Camera size={16} />
+              {verifUploading ? "Envoi..." : "Prendre un selfie"}
+            </button>
+            <input
+              ref={verifInputRef} type="file" accept="image/*" capture="user"
+              onChange={submitSelfie} style={{ display: "none" }}
+            />
+            {!API_BASE && <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 8 }}>Connecte le backend pour activer la vérification.</p>}
+            {verifError && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 8 }}>{verifError}</p>}
+          </>
+        )}
       </div>
       <div style={{ marginTop: 24 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes photos</label>
@@ -1166,7 +1244,117 @@ const fieldInput = {
   background: "none", border: "none", outline: "none", color: "#FBEFE9", fontSize: 14, flex: 1,
 };
 
-export default function DatingAppMVP() {
+function AdminScreen() {
+  const [adminKey, setAdminKey] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
+  const [pending, setPending] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = async (key) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/verifications`, { headers: { "x-admin-key": key } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Accès refusé.");
+      setPending(data.pending || []);
+      setUnlocked(true);
+    } catch (e) {
+      setError(e.message || "Erreur de connexion.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const decide = async (userId, approve) => {
+    try {
+      await fetch(`${API_BASE}/api/admin/verifications/${userId}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ approve }),
+      });
+      setPending((p) => p.filter((u) => u.id !== userId));
+    } catch {
+      setError("Impossible d'enregistrer la décision. Réessaie.");
+    }
+  };
+
+  if (!API_BASE) {
+    return (
+      <div style={{ padding: 40, color: "#FBEFE9", fontFamily: "Inter, sans-serif" }}>
+        Connecte le backend (API_BASE) pour utiliser le tableau de bord admin.
+      </div>
+    );
+  }
+
+  if (!unlocked) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#1B1223", display: "flex", alignItems: "center",
+        justifyContent: "center", fontFamily: "Inter, sans-serif",
+      }}>
+        <div style={{ background: "#2A1B33", padding: 32, borderRadius: 16, width: 320 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, marginBottom: 16 }}>Accès administrateur</p>
+          <input
+            type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)}
+            placeholder="Clé admin"
+            style={{
+              width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(255,255,255,0.08)", color: "#FBEFE9", outline: "none", boxSizing: "border-box",
+            }}
+          />
+          {error && <p style={{ color: "#FF6B5B", fontSize: 12.5, marginTop: 8 }}>{error}</p>}
+          <button
+            onClick={() => load(adminKey)} disabled={loading}
+            style={{
+              marginTop: 14, width: "100%", padding: "11px 0", borderRadius: 10, cursor: "pointer",
+              background: "#FF6B5B", color: "#FBEFE9", border: "none", fontWeight: 600,
+            }}
+          >{loading ? "Vérification..." : "Entrer"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#1B1223", padding: 24, fontFamily: "Inter, sans-serif" }}>
+      <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 20 }}>
+        Vérifications en attente ({pending.length})
+      </p>
+      {pending.length === 0 && <p style={{ color: "#B39FBF" }}>Aucune demande en attente pour le moment.</p>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+        {pending.map((u) => (
+          <div key={u.id} style={{ background: "#2A1B33", borderRadius: 14, padding: 16 }}>
+            <p style={{ color: "#FBEFE9", fontWeight: 600, marginBottom: 4 }}>{u.name} <span style={{ color: "#8C7A94", fontWeight: 400 }}>({u.email})</span></p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Selfie soumis</p>
+                <img src={u.verification_selfie} alt="Selfie" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Photo de profil</p>
+                <img src={u.photos?.[0] || u.img} alt="Profil" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button onClick={() => decide(u.id, false)} style={{
+                flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
+                background: "rgba(255,107,91,0.15)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 13,
+              }}>Refuser</button>
+              <button onClick={() => decide(u.id, true)} style={{
+                flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
+                background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)", fontSize: 13,
+              }}>Valider</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MainApp() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("discover");
   const [matches, setMatches] = useState([]);
@@ -1266,4 +1454,9 @@ export default function DatingAppMVP() {
       )}
     </div>
   );
+}
+
+export default function DatingAppMVP() {
+  const isAdminRoute = typeof window !== "undefined" && window.location.search.includes("admin=true");
+  return isAdminRoute ? <AdminScreen /> : <MainApp />;
 }
