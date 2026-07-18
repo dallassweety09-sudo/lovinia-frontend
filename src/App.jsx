@@ -5,6 +5,27 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
 const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
+// CLOUDINARY : pour l'upload réel de photos de profil depuis le téléphone.
+// Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
+const CLOUDINARY_CLOUD_NAME = "";
+const CLOUDINARY_UPLOAD_PRESET = "";
+
+async function uploadPhotoToCloudinary(file) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error("Cloudinary n'est pas encore configuré.");
+  }
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || "Échec de l'envoi de la photo.");
+  return data.secure_url;
+}
+
 const INTENTIONS = [
   { value: "❤️ Relation sérieuse", emoji: "❤️", label: "Relation sérieuse" },
   { value: "💕 Rencontres sans prise de tête", emoji: "💕", label: "Sans prise de tête" },
@@ -107,11 +128,11 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
-          <MapPin size={13} /> {profile.city}
+          <MapPin size={13} /> {profile.city}{profile.profession ? ` · ${profile.profession}` : ""}
         </div>
         <p style={{ marginTop: 10, color: "#F0E3EC", fontSize: 14, lineHeight: 1.5, maxWidth: 320 }}>{profile.bio}</p>
         <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
-          {(profile.tags || []).map((t) => (
+          {(profile.interests?.length ? profile.interests : profile.tags || []).map((t) => (
             <span key={t} style={{
               fontSize: 12, padding: "5px 11px", borderRadius: 999,
               background: "rgba(255,255,255,0.14)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.2)",
@@ -681,28 +702,160 @@ function ProfileScreen({ user, onLogout }) {
   );
 }
 
+const GENRES = ["Homme", "Femme"];
+const GENRES_RECHERCHE = ["Homme", "Femme", "Tous"];
+const REGISTER_STEPS = ["compte", "details", "interets", "intention", "photos"];
+
+function TagInput({ label, values, onChange, placeholder }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const v = draft.trim();
+    if (v && !values.includes(v)) onChange([...values, v]);
+    setDraft("");
+  };
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</label>
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder={placeholder}
+          style={{ ...fieldInput, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, padding: "10px 14px" }}
+        />
+        <button type="button" onClick={add} style={{
+          padding: "0 16px", borderRadius: 12, background: "#FF6B5B", color: "#FBEFE9", border: "none", cursor: "pointer", fontSize: 13,
+        }}>Ajouter</button>
+      </div>
+      {values.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          {values.map((v) => (
+            <span key={v} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 999,
+              background: "rgba(255,255,255,0.1)", color: "#FBEFE9", fontSize: 12.5,
+            }}>
+              {v}
+              <X size={12} style={{ cursor: "pointer" }} onClick={() => onChange(values.filter((x) => x !== v))} />
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotoUploader({ photos, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [manualUrl, setManualUrl] = useState("");
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError("");
+    setUploading(true);
+    try {
+      const url = await uploadPhotoToCloudinary(file);
+      onChange([...photos, url]);
+    } catch (err) {
+      setUploadError(err.message || "Échec de l'envoi.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const addManualUrl = () => {
+    if (manualUrl.trim()) {
+      onChange([...photos, manualUrl.trim()]);
+      setManualUrl("");
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        {photos.map((url, i) => (
+          <div key={i} style={{ position: "relative", aspectRatio: "3/4", borderRadius: 12, overflow: "hidden" }}>
+            <img src={url} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <button type="button" onClick={() => onChange(photos.filter((_, idx) => idx !== i))} style={{
+              position: "absolute", top: 4, right: 4, background: "rgba(27,18,35,0.8)", border: "none",
+              borderRadius: "50%", width: 22, height: 22, color: "#FBEFE9", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center",
+            }}><X size={12} /></button>
+          </div>
+        ))}
+        {photos.length < 6 && (
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} style={{
+            aspectRatio: "3/4", borderRadius: 12, border: "1px dashed rgba(255,255,255,0.25)",
+            background: "rgba(255,255,255,0.04)", color: "#B39FBF", cursor: uploading ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
+          }}>{uploading ? "..." : "+"}</button>
+        )}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
+      {!CLOUDINARY_CLOUD_NAME && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ color: "#6B5A73", fontSize: 11.5, marginBottom: 8 }}>
+            Cloudinary n'est pas encore configuré — colle un lien d'image en attendant :
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} placeholder="https://..."
+              style={{ ...fieldInput, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, padding: "10px 14px" }} />
+            <button type="button" onClick={addManualUrl} style={{
+              padding: "0 16px", borderRadius: 12, background: "#FF6B5B", color: "#FBEFE9", border: "none", cursor: "pointer", fontSize: 13,
+            }}>+</button>
+          </div>
+        </div>
+      )}
+      {uploadError && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 8 }}>{uploadError}</p>}
+      <p style={{ color: "#8C7A94", fontSize: 11.5, marginTop: 10 }}>{photos.length}/2 photos minimum</p>
+    </div>
+  );
+}
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("register"); // "register" | "login"
-  const [form, setForm] = useState({ name: "", email: "", password: "", intention: "" });
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({
+    name: "", email: "", password: "",
+    birthdate: "", genre: "", genre_recherche: "Tous", city: "", profession: "", taille: "",
+    interests: [], langues: [], intention: "", photos: [],
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const submit = async () => {
+  const validateStep = () => {
+    if (mode !== "register") return true;
+    const s = REGISTER_STEPS[step];
+    if (s === "compte" && (!form.name || !form.email || !form.password)) return "Merci de remplir tous les champs.";
+    if (s === "details" && (!form.birthdate || !form.genre || !form.city)) return "Merci de compléter tes informations.";
+    if (s === "intention" && !form.intention) return "Choisis ce que tu recherches sur Lovinia.";
+    if (s === "photos" && form.photos.length < 2) return "Ajoute au moins 2 photos pour continuer.";
+    return null;
+  };
+
+  const goNext = () => {
+    const err = validateStep();
+    if (err) { setError(err); return; }
     setError("");
-    if (!form.email || !form.password || (mode === "register" && !form.name)) {
-      setError("Merci de remplir tous les champs.");
-      return;
-    }
-    if (mode === "register" && !form.intention) {
-      setError("Choisis ce que tu recherches sur Lovinia pour continuer.");
-      return;
-    }
+    if (step < REGISTER_STEPS.length - 1) setStep(step + 1);
+    else submit();
+  };
+
+  const goBack = () => {
+    setError("");
+    if (step > 0) setStep(step - 1);
+  };
+
+  const submit = async () => {
     setLoading(true);
     try {
       if (API_BASE) {
-        // Connecté à un vrai backend (voir dating-app-backend/README.md)
         const res = await fetch(`${API_BASE}/api/auth/${mode === "register" ? "register" : "login"}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -713,7 +866,6 @@ function AuthScreen({ onAuth }) {
         localStorage.setItem("token", data.token);
         onAuth({ id: data.user.id, name: data.user.name, email: data.user.email });
       } else {
-        // Mode démo : pas de serveur, on simule la connexion localement.
         await new Promise((r) => setTimeout(r, 400));
         onAuth({ id: "demo", name: form.name || form.email.split("@")[0], email: form.email });
       }
@@ -724,90 +876,152 @@ function AuthScreen({ onAuth }) {
     }
   };
 
-  return (
-    <div style={{
-      display: "flex", flexDirection: "column", height: "100%", padding: "48px 26px 30px", justifyContent: "center",
-    }}>
-      <div style={{ textAlign: "center", marginBottom: 30 }}>
-        <Heart size={38} color="#FF6B5B" fill="#FF6B5B" />
-        <p style={{ fontFamily: "Fraunces, serif", fontSize: 32, color: "#FBEFE9", fontWeight: 700, margin: "10px 0 0", letterSpacing: 0.5 }}>
-          Lovinia
-        </p>
-        <p style={{ fontFamily: "Fraunces, serif", fontSize: 20, color: "#F2B84B", fontWeight: 600, margin: "2px 0 8px" }}>
-          {mode === "register" ? "Crée ton compte" : "Bon retour"}
-        </p>
-        <p style={{ color: "#B39FBF", fontSize: 13 }}>
-          {mode === "register" ? "Rejoins la communauté en quelques secondes" : "Connecte-toi pour continuer"}
-        </p>
-      </div>
-
-      {mode === "register" && (
+  // Mode connexion : formulaire simple, une seule étape
+  if (mode === "login") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "48px 26px 30px", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", marginBottom: 30 }}>
+          <Heart size={38} color="#FF6B5B" fill="#FF6B5B" />
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 32, color: "#FBEFE9", fontWeight: 700, margin: "10px 0 0" }}>Lovinia</p>
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 20, color: "#F2B84B", fontWeight: 600, margin: "2px 0 8px" }}>Bon retour</p>
+          <p style={{ color: "#B39FBF", fontSize: 13 }}>Connecte-toi pour continuer</p>
+        </div>
         <div style={{ marginBottom: 12 }}>
-          <div style={fieldWrap}>
-            <User size={16} color="#8C7A94" />
-            <input placeholder="Ton prénom" value={form.name} onChange={(e) => set("name", e.target.value)} style={fieldInput} />
-          </div>
+          <div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div>
         </div>
-      )}
-      <div style={{ marginBottom: 12 }}>
-        <div style={fieldWrap}>
-          <Mail size={16} color="#8C7A94" />
-          <input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} />
+        <div style={{ marginBottom: 8 }}>
+          <div style={fieldWrap}><Lock size={16} color="#8C7A94" /><input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} /></div>
         </div>
+        {error && <p style={{ color: "#FF6B5B", fontSize: 12, margin: "8px 0 0" }}>{error}</p>}
+        <button onClick={submit} disabled={loading} style={{
+          marginTop: 18, padding: "13px 0", borderRadius: 14, cursor: loading ? "default" : "pointer",
+          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
+        }}><LogIn size={16} />{loading ? "Connexion..." : "Se connecter"}</button>
+        <p style={{ textAlign: "center", color: "#B39FBF", fontSize: 13, marginTop: 18 }}>
+          Pas encore de compte ? <span onClick={() => setMode("register")} style={{ color: "#F2B84B", cursor: "pointer" }}>S'inscrire</span>
+        </p>
+        {!API_BASE && <p style={{ textAlign: "center", color: "#6B5A73", fontSize: 11, marginTop: 14 }}>Mode démo — connecte le backend pour une vraie authentification.</p>}
       </div>
-      <div style={{ marginBottom: 8 }}>
-        <div style={fieldWrap}>
-          <Lock size={16} color="#8C7A94" />
-          <input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} />
-        </div>
+    );
+  }
+
+  // Mode inscription : parcours en plusieurs étapes
+  const stepName = REGISTER_STEPS[step];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "28px 24px 24px" }}>
+      <div style={{ textAlign: "center", marginBottom: 18 }}>
+        <Heart size={30} color="#FF6B5B" fill="#FF6B5B" />
+        <p style={{ fontFamily: "Fraunces, serif", fontSize: 24, color: "#FBEFE9", fontWeight: 700, margin: "8px 0 0" }}>Lovinia</p>
       </div>
 
-      {mode === "register" && (
-        <div style={{ marginTop: 14, marginBottom: 4 }}>
-          <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            Tu recherches...
-          </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-            {INTENTIONS.map((it) => (
-              <button
-                key={it.value}
-                type="button"
-                onClick={() => set("intention", it.value)}
-                style={{
-                  padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+      <div style={{ display: "flex", gap: 5, marginBottom: 18 }}>
+        {REGISTER_STEPS.map((s, i) => (
+          <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= step ? "#FF6B5B" : "rgba(255,255,255,0.12)" }} />
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {stepName === "compte" && (
+          <>
+            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Créons ton compte</p>
+            <div style={{ marginBottom: 12 }}><div style={fieldWrap}><User size={16} color="#8C7A94" /><input placeholder="Ton prénom" value={form.name} onChange={(e) => set("name", e.target.value)} style={fieldInput} /></div></div>
+            <div style={{ marginBottom: 12 }}><div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div></div>
+            <div style={{ marginBottom: 8 }}><div style={fieldWrap}><Lock size={16} color="#8C7A94" /><input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} /></div></div>
+          </>
+        )}
+
+        {stepName === "details" && (
+          <>
+            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Parle-nous de toi</p>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: "#B39FBF", fontSize: 12 }}>Date de naissance</label>
+              <div style={{ ...fieldWrap, marginTop: 6 }}><input type="date" value={form.birthdate} onChange={(e) => set("birthdate", e.target.value)} style={{ ...fieldInput, colorScheme: "dark" }} /></div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: "#B39FBF", fontSize: 12 }}>Tu es...</label>
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                {GENRES.map((g) => (
+                  <button key={g} type="button" onClick={() => set("genre", g)} style={{
+                    flex: 1, padding: "9px 0", borderRadius: 12, cursor: "pointer",
+                    background: form.genre === g ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                    color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13,
+                  }}>{g}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: "#B39FBF", fontSize: 12 }}>Tu recherches un(e)...</label>
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                {GENRES_RECHERCHE.map((g) => (
+                  <button key={g} type="button" onClick={() => set("genre_recherche", g)} style={{
+                    flex: 1, padding: "9px 0", borderRadius: 12, cursor: "pointer",
+                    background: form.genre_recherche === g ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                    color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13,
+                  }}>{g}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}><div style={fieldWrap}><MapPin size={16} color="#8C7A94" /><input placeholder="Ta ville" value={form.city} onChange={(e) => set("city", e.target.value)} style={fieldInput} /></div></div>
+            <div style={{ marginBottom: 12 }}><div style={fieldWrap}><input placeholder="Profession (facultatif)" value={form.profession} onChange={(e) => set("profession", e.target.value)} style={fieldInput} /></div></div>
+            <div style={{ marginBottom: 8 }}><div style={fieldWrap}><input placeholder="Taille en cm (facultatif)" type="number" value={form.taille} onChange={(e) => set("taille", e.target.value)} style={fieldInput} /></div></div>
+          </>
+        )}
+
+        {stepName === "interets" && (
+          <>
+            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tes centres d'intérêt</p>
+            <TagInput label="Centres d'intérêt" values={form.interests} onChange={(v) => set("interests", v)} placeholder="Ex: Musique, Voyage..." />
+            <TagInput label="Langues parlées" values={form.langues} onChange={(v) => set("langues", v)} placeholder="Ex: Français, Anglais..." />
+          </>
+        )}
+
+        {stepName === "intention" && (
+          <>
+            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tu recherches...</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {INTENTIONS.map((it) => (
+                <button key={it.value} type="button" onClick={() => set("intention", it.value)} style={{
+                  padding: "9px 13px", borderRadius: 12, cursor: "pointer", fontSize: 13,
                   background: form.intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
                   color: "#FBEFE9", border: form.intention === it.value ? "1px solid #FF6B5B" : "1px solid rgba(255,255,255,0.14)",
-                }}
-              >
-                {it.emoji} {it.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+                }}>{it.emoji} {it.label}</button>
+              ))}
+            </div>
+          </>
+        )}
 
-      {error && <p style={{ color: "#FF6B5B", fontSize: 12, margin: "8px 0 0" }}>{error}</p>}
+        {stepName === "photos" && (
+          <>
+            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Ajoute tes photos</p>
+            <PhotoUploader photos={form.photos} onChange={(v) => set("photos", v)} />
+          </>
+        )}
+      </div>
 
-      <button onClick={submit} disabled={loading} style={{
-        marginTop: 18, padding: "13px 0", borderRadius: 14, cursor: loading ? "default" : "pointer",
-        background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
-      }}>
-        <LogIn size={16} />
-        {loading ? "Connexion..." : mode === "register" ? "S'inscrire" : "Se connecter"}
-      </button>
+      {error && <p style={{ color: "#FF6B5B", fontSize: 12, margin: "10px 0 0" }}>{error}</p>}
 
-      <p style={{ textAlign: "center", color: "#B39FBF", fontSize: 13, marginTop: 18 }}>
-        {mode === "register" ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
-        <span onClick={() => setMode(mode === "register" ? "login" : "register")} style={{ color: "#F2B84B", cursor: "pointer" }}>
-          {mode === "register" ? "Se connecter" : "S'inscrire"}
-        </span>
+      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+        {step > 0 && (
+          <button onClick={goBack} style={{
+            flex: 1, padding: "13px 0", borderRadius: 14, cursor: "pointer",
+            background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 14,
+          }}>Retour</button>
+        )}
+        <button onClick={goNext} disabled={loading} style={{
+          flex: 2, padding: "13px 0", borderRadius: 14, cursor: loading ? "default" : "pointer",
+          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
+        }}>
+          <LogIn size={16} />
+          {loading ? "Création..." : step < REGISTER_STEPS.length - 1 ? "Suivant" : "S'inscrire"}
+        </button>
+      </div>
+
+      <p style={{ textAlign: "center", color: "#B39FBF", fontSize: 13, marginTop: 14 }}>
+        Déjà un compte ? <span onClick={() => setMode("login")} style={{ color: "#F2B84B", cursor: "pointer" }}>Se connecter</span>
       </p>
-      {!API_BASE && (
-        <p style={{ textAlign: "center", color: "#6B5A73", fontSize: 11, marginTop: 14 }}>
-          Mode démo — connecte le backend pour une vraie authentification.
-        </p>
-      )}
+      {!API_BASE && <p style={{ textAlign: "center", color: "#6B5A73", fontSize: 11, marginTop: 10 }}>Mode démo — connecte le backend pour une vraie authentification.</p>}
     </div>
   );
 }
