@@ -9,6 +9,11 @@ const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
 const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
 const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
+
+// GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
+// Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
+const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
+
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -337,7 +342,7 @@ function DiscoverScreen({ onNewMatch }) {
     <div style={{ padding: "18px 18px 0", display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Heart size={18} color="#FF6B5B" fill="#FF6B5B" />
+          <img src="/logo.png" alt="Lovinia" style={{ width: 24, height: 24, borderRadius: 6 }} />
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 700, color: "#FBEFE9" }}>Lovinia</span>
         </div>
         <button onClick={() => setShowFilters(true)} style={{
@@ -1026,6 +1031,32 @@ function PhotoUploader({ photos, onChange }) {
   );
 }
 
+function GoogleSignInButton({ onGoogleAuth, disabled }) {
+  const divRef = useRef(null);
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !window.google?.accounts?.id || !divRef.current) return;
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response) => onGoogleAuth(response.credential),
+    });
+    window.google.accounts.id.renderButton(divRef.current, {
+      theme: "filled_black", size: "large", width: 280, text: "continue_with", shape: "pill",
+    });
+  }, [onGoogleAuth]);
+
+  if (!GOOGLE_CLIENT_ID) {
+    return (
+      <div style={{
+        padding: "11px 0", borderRadius: 999, textAlign: "center", fontSize: 13,
+        background: "rgba(255,255,255,0.05)", color: "#6B5A73", border: "1px solid rgba(255,255,255,0.1)",
+      }}>Connexion Google bientôt disponible</div>
+    );
+  }
+
+  return <div ref={divRef} style={{ display: "flex", justifyContent: "center", opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? "none" : "auto" }} />;
+}
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("register"); // "register" | "login"
   const [step, setStep] = useState(0);
@@ -1086,16 +1117,49 @@ function AuthScreen({ onAuth }) {
     }
   };
 
+  const handleGoogleAuth = useCallback(async (credential) => {
+    setError("");
+    setLoading(true);
+    try {
+      if (API_BASE) {
+        const res = await fetch(`${API_BASE}/api/auth/google`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Connexion Google impossible.");
+        localStorage.setItem("token", data.token);
+        onAuth({ id: data.user.id, name: data.user.name, email: data.user.email });
+      } else {
+        onAuth({ id: "demo", name: "Compte Google (démo)", email: "demo@gmail.com" });
+      }
+    } catch (e) {
+      setError(e.message || "Connexion Google impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuth]);
+
   // Mode connexion : formulaire simple, une seule étape
   if (mode === "login") {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "48px 26px 30px", justifyContent: "center" }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
-          <Heart size={38} color="#FF6B5B" fill="#FF6B5B" />
+          <img src="/logo.png" alt="Lovinia" style={{ width: 64, height: 64, borderRadius: 16 }} />
           <p style={{ fontFamily: "Fraunces, serif", fontSize: 32, color: "#FBEFE9", fontWeight: 700, margin: "10px 0 0" }}>Lovinia</p>
+          <p style={{ color: "#E89BB0", fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", margin: "2px 0 10px" }}>Connectez les cœurs</p>
           <p style={{ fontFamily: "Fraunces, serif", fontSize: 20, color: "#F2B84B", fontWeight: 600, margin: "2px 0 8px" }}>Bon retour</p>
           <p style={{ color: "#B39FBF", fontSize: 13 }}>Connecte-toi pour continuer</p>
         </div>
+
+        <GoogleSignInButton onGoogleAuth={handleGoogleAuth} disabled={loading} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0" }}>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+          <span style={{ color: "#6B5A73", fontSize: 12 }}>ou</span>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+        </div>
+
         <div style={{ marginBottom: 12 }}>
           <div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div>
         </div>
@@ -1121,8 +1185,9 @@ function AuthScreen({ onAuth }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "28px 24px 24px" }}>
       <div style={{ textAlign: "center", marginBottom: 18 }}>
-        <Heart size={30} color="#FF6B5B" fill="#FF6B5B" />
+        <img src="/logo.png" alt="Lovinia" style={{ width: 48, height: 48, borderRadius: 12 }} />
         <p style={{ fontFamily: "Fraunces, serif", fontSize: 24, color: "#FBEFE9", fontWeight: 700, margin: "8px 0 0" }}>Lovinia</p>
+        <p style={{ color: "#E89BB0", fontSize: 10.5, letterSpacing: 1.3, textTransform: "uppercase", margin: "2px 0 0" }}>Connectez les cœurs</p>
       </div>
 
       <div style={{ display: "flex", gap: 5, marginBottom: 18 }}>
@@ -1135,6 +1200,14 @@ function AuthScreen({ onAuth }) {
         {stepName === "compte" && (
           <>
             <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Créons ton compte</p>
+
+            <GoogleSignInButton onGoogleAuth={handleGoogleAuth} disabled={loading} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
+              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+              <span style={{ color: "#6B5A73", fontSize: 12 }}>ou avec ton email</span>
+              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+            </div>
+
             <div style={{ marginBottom: 12 }}><div style={fieldWrap}><User size={16} color="#8C7A94" /><input placeholder="Ton prénom" value={form.name} onChange={(e) => set("name", e.target.value)} style={fieldInput} /></div></div>
             <div style={{ marginBottom: 12 }}><div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div></div>
             <div style={{ marginBottom: 8 }}><div style={fieldWrap}><Lock size={16} color="#8C7A94" /><input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} /></div></div>
