@@ -891,6 +891,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 const GENRES = ["Homme", "Femme"];
 const GENRES_RECHERCHE = ["Homme", "Femme", "Tous"];
 const REGISTER_STEPS = ["compte", "details", "interets", "intention", "photos"];
+const GOOGLE_COMPLETION_STEPS = ["details", "interets", "intention", "photos"];
 
 function TagInput({ label, values, onChange, placeholder }) {
   const [draft, setDraft] = useState("");
@@ -1057,8 +1058,9 @@ function GoogleSignInButton({ onGoogleAuth, disabled }) {
 }
 
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState("register"); // "register" | "login"
+  const [mode, setMode] = useState("register"); // "register" | "login" | "complete-google"
   const [step, setStep] = useState(0);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const [form, setForm] = useState({
     name: "", email: "", password: "",
     birthdate: "", genre: "", genre_recherche: "Tous", city: "", profession: "", taille: "",
@@ -1067,11 +1069,13 @@ function AuthScreen({ onAuth }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const steps = mode === "complete-google" ? GOOGLE_COMPLETION_STEPS : REGISTER_STEPS;
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const validateStep = () => {
-    if (mode !== "register") return true;
-    const s = REGISTER_STEPS[step];
+    if (mode === "login") return true;
+    const s = steps[step];
     if (s === "compte" && (!form.name || !form.email || !form.password)) return "Merci de remplir tous les champs.";
     if (s === "details" && (!form.birthdate || !form.genre || !form.city)) return "Merci de compléter tes informations.";
     if (s === "intention" && !form.intention) return "Choisis ce que tu recherches sur Lovinia.";
@@ -1083,7 +1087,8 @@ function AuthScreen({ onAuth }) {
     const err = validateStep();
     if (err) { setError(err); return; }
     setError("");
-    if (step < REGISTER_STEPS.length - 1) setStep(step + 1);
+    if (step < steps.length - 1) setStep(step + 1);
+    else if (mode === "complete-google") completeGoogleProfile();
     else submit();
   };
 
@@ -1116,6 +1121,30 @@ function AuthScreen({ onAuth }) {
     }
   };
 
+  const completeGoogleProfile = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/me`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          birthdate: form.birthdate, genre: form.genre, genre_recherche: form.genre_recherche,
+          city: form.city, profession: form.profession, taille: form.taille ? Number(form.taille) : null,
+          interests: form.interests, langues: form.langues, intention: form.intention, photos: form.photos,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Impossible de finaliser ton profil.");
+      onAuth(pendingGoogleUser);
+    } catch (e) {
+      setError(e.message || "Une erreur est survenue.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleAuth = useCallback(async (credential) => {
     setError("");
     setLoading(true);
@@ -1129,7 +1158,15 @@ function AuthScreen({ onAuth }) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Connexion Google impossible.");
         localStorage.setItem("token", data.token);
-        onAuth({ id: data.user.id, name: data.user.name, email: data.user.email });
+        const googleUser = { id: data.user.id, name: data.user.name, email: data.user.email };
+        if (data.needsProfileCompletion) {
+          setPendingGoogleUser(googleUser);
+          setForm((f) => ({ ...f, name: data.user.name, email: data.user.email }));
+          setMode("complete-google");
+          setStep(0);
+        } else {
+          onAuth(googleUser);
+        }
       } else {
         onAuth({ id: "demo", name: "Compte Google (démo)", email: "demo@gmail.com" });
       }
@@ -1180,17 +1217,20 @@ function AuthScreen({ onAuth }) {
   }
 
   // Mode inscription : parcours en plusieurs étapes
-  const stepName = REGISTER_STEPS[step];
+  const stepName = steps[step];
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "28px 24px 24px" }}>
       <div style={{ textAlign: "center", marginBottom: 18 }}>
         <img src="/logo.png" alt="Lovinia" style={{ width: 48, height: 48, borderRadius: 12 }} />
         <p style={{ fontFamily: "Fraunces, serif", fontSize: 24, color: "#FBEFE9", fontWeight: 700, margin: "8px 0 0" }}>Lovinia</p>
         <p style={{ color: "#E89BB0", fontSize: 10.5, letterSpacing: 1.3, textTransform: "uppercase", margin: "2px 0 0" }}>Connectez les cœurs</p>
+        {mode === "complete-google" && (
+          <p style={{ color: "#F2B84B", fontSize: 12.5, marginTop: 10 }}>Encore quelques infos pour finaliser ton profil</p>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 5, marginBottom: 18 }}>
-        {REGISTER_STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= step ? "#FF6B5B" : "rgba(255,255,255,0.12)" }} />
         ))}
       </div>
@@ -1296,7 +1336,7 @@ function AuthScreen({ onAuth }) {
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
         }}>
           <LogIn size={16} />
-          {loading ? "Création..." : step < REGISTER_STEPS.length - 1 ? "Suivant" : "S'inscrire"}
+          {loading ? "Enregistrement..." : step < steps.length - 1 ? "Suivant" : (mode === "complete-google" ? "Terminer" : "S'inscrire")}
         </button>
       </div>
 
