@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -271,6 +271,22 @@ function DiscoverScreen({ onNewMatch }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [spark, setSpark] = useState(false);
+  const [limits, setLimits] = useState(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  const loadLimits = useCallback(async () => {
+    if (!API_BASE) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/me/limits`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setLimits(data);
+    } catch {
+      // Silencieux : l'absence de compteur n'empêche pas de swiper.
+    }
+  }, []);
+
+  useEffect(() => { loadLimits(); }, [loadLimits]);
 
   const loadProfiles = useCallback(async (f) => {
     setLoading(true);
@@ -311,6 +327,12 @@ function DiscoverScreen({ onNewMatch }) {
   const swipe = useCallback(async (dir) => {
     const current = deck[0];
     if (!current) return;
+
+    if (dir === "like" && API_BASE && limits && !limits.unlimited && limits.remaining <= 0) {
+      setShowPaywall(true);
+      return;
+    }
+
     setDeck((d) => d.slice(1));
 
     if (dir === "like") {
@@ -327,7 +349,13 @@ function DiscoverScreen({ onNewMatch }) {
           body: JSON.stringify({ toUserId: current.id, action: dir === "like" ? "like" : "pass" }),
         });
         const data = await res.json();
+        if (res.status === 403 && data.code === "LIKE_LIMIT_REACHED") {
+          setShowPaywall(true);
+          setLimits((l) => (l ? { ...l, remaining: 0 } : l));
+          return;
+        }
         if (data.matched) onNewMatch(current);
+        if (dir === "like") setLimits((l) => (l && !l.unlimited ? { ...l, remaining: Math.max(0, l.remaining - 1), used: l.used + 1 } : l));
       } catch {
         // Silencieux : en cas de coupure réseau, le swipe reste local pour ne pas bloquer l'utilisateur.
       }
@@ -335,7 +363,7 @@ function DiscoverScreen({ onNewMatch }) {
       // Mode démo : on simule un match aléatoire.
       onNewMatch(current);
     }
-  }, [deck, onNewMatch]);
+  }, [deck, onNewMatch, limits]);
 
   return (
     <div style={{ padding: "18px 18px 0", display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
@@ -352,6 +380,12 @@ function DiscoverScreen({ onNewMatch }) {
           <span style={{ fontSize: 12 }}>Filtres</span>
         </button>
       </div>
+
+      {limits && !limits.unlimited && (
+        <div style={{ marginBottom: 10, color: "#8C7A94", fontSize: 11.5 }}>
+          {limits.remaining} like{limits.remaining > 1 ? "s" : ""} restant{limits.remaining > 1 ? "s" : ""} aujourd'hui
+        </div>
+      )}
 
       {showFilters && (
         <FiltersPanel filters={filters} onChange={applyFilters} onClose={() => setShowFilters(false)} />
@@ -413,6 +447,55 @@ function DiscoverScreen({ onNewMatch }) {
           <Star size={24} fill="#F2B84B" />
         </button>
       </div>
+
+      {showPaywall && (
+        <div style={{
+          position: "absolute", inset: 0, background: "rgba(27,18,35,0.96)", zIndex: 60,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 28, textAlign: "center",
+        }}>
+          <button onClick={() => setShowPaywall(false)} style={{
+            position: "absolute", top: 16, right: 16, background: "none", border: "none", color: "#8C7A94", cursor: "pointer",
+          }}><X size={20} /></button>
+
+          <Crown size={40} color="#F2B84B" />
+          <p style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#FBEFE9", fontWeight: 700, marginTop: 12 }}>
+            Limite quotidienne atteinte
+          </p>
+          <p style={{ color: "#D8C4D0", fontSize: 13.5, marginTop: 8, maxWidth: 260 }}>
+            Tu as utilisé tes {limits?.limit || ""} likes gratuits d'aujourd'hui. Passe Premium pour des likes illimités, à tout moment.
+          </p>
+
+          <div style={{ width: "100%", maxWidth: 280, marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              { name: "Premium", price: "10 $ / 2 mois", detail: "Likes illimités", icon: Zap },
+              { name: "VIP", price: "15 $ / 2 mois", detail: "+ Messages sans match, profil mis en avant", icon: Crown },
+              { name: "Super VIP", price: "50 $ / 12 mois", detail: "Tous les avantages, priorité maximale", icon: Sparkles },
+            ].map((plan) => (
+              <div key={plan.name} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14,
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", textAlign: "left",
+              }}>
+                <plan.icon size={20} color="#F2B84B" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#FBEFE9", fontWeight: 600, fontSize: 13.5 }}>{plan.name}</span>
+                    <span style={{ color: "#F2B84B", fontSize: 12.5 }}>{plan.price}</span>
+                  </div>
+                  <p style={{ color: "#B39FBF", fontSize: 11.5, marginTop: 2 }}>{plan.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 18 }}>
+            Le paiement en ligne arrive bientôt — reviens vite !
+          </p>
+          <button onClick={() => setShowPaywall(false)} style={{
+            marginTop: 10, padding: "10px 24px", borderRadius: 999, cursor: "pointer",
+            background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13,
+          }}>Continuer en gratuit</button>
+        </div>
+      )}
     </div>
   );
 }
