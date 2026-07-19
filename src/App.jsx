@@ -13,7 +13,6 @@ const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
 // Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
 const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
-
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
