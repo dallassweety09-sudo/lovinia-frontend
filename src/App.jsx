@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -13,7 +13,6 @@ const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
 // Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
 const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com"
-
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -62,7 +61,155 @@ const CONVERSATIONS = [
     ] },
 ];
 
-function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
+const REPORT_REASONS = ["Faux profil", "Contenu inapproprié", "Harcèlement", "Arnaque / Spam", "Autre"];
+
+function ReportBlockMenu({ targetId, targetName, onBlocked, iconColor = "#FBEFE9" }) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState("menu"); // "menu" | "report" | "block-confirm" | "done"
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const close = () => { setOpen(false); setView("menu"); setReason(""); setDetails(""); };
+
+  const submitReport = async () => {
+    if (!reason) return;
+    setBusy(true);
+    try {
+      if (API_BASE) {
+        const token = localStorage.getItem("token");
+        await fetch(`${API_BASE}/api/report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ reportedId: targetId, reason, details }),
+        });
+      }
+      setView("done");
+    } catch {
+      setView("done");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmBlock = async () => {
+    setBusy(true);
+    try {
+      if (API_BASE) {
+        const token = localStorage.getItem("token");
+        await fetch(`${API_BASE}/api/block/${targetId}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      close();
+      onBlocked?.();
+    } catch {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        style={{ background: "rgba(27,18,35,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+      >
+        <MoreVertical size={16} color={iconColor} />
+      </button>
+
+      {open && (
+        <div
+          onClick={(e) => { e.stopPropagation(); close(); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.75)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400,
+          }}>
+            {view === "menu" && (
+              <>
+                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 14 }}>{targetName}</p>
+                <button onClick={() => setView("report")} style={menuBtnStyle}>
+                  <Flag size={16} /> Signaler ce profil
+                </button>
+                <button onClick={() => setView("block-confirm")} style={{ ...menuBtnStyle, color: "#FF6B5B" }}>
+                  <ShieldOff size={16} /> Bloquer cette personne
+                </button>
+                <button onClick={close} style={{ ...menuBtnStyle, color: "#8C7A94", marginTop: 6 }}>Annuler</button>
+              </>
+            )}
+
+            {view === "report" && (
+              <>
+                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 4 }}>Signaler {targetName}</p>
+                <p style={{ color: "#B39FBF", fontSize: 12.5, marginBottom: 14 }}>Choisis le motif qui correspond le mieux :</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {REPORT_REASONS.map((r) => (
+                    <button key={r} onClick={() => setReason(r)} style={{
+                      padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+                      background: reason === r ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                      color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+                    }}>{r}</button>
+                  ))}
+                </div>
+                <textarea
+                  value={details} onChange={(e) => setDetails(e.target.value)} rows={2}
+                  placeholder="Précise si besoin (facultatif)"
+                  style={{
+                    width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: 10, outline: "none", resize: "none", boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                  <button onClick={() => setView("menu")} style={{ ...menuBtnStyle, flex: 1, justifyContent: "center" }}>Retour</button>
+                  <button onClick={submitReport} disabled={!reason || busy} style={{
+                    flex: 1, padding: "11px 0", borderRadius: 12, cursor: "pointer",
+                    background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 13.5, fontWeight: 600, opacity: !reason || busy ? 0.6 : 1,
+                  }}>{busy ? "Envoi..." : "Envoyer"}</button>
+                </div>
+              </>
+            )}
+
+            {view === "block-confirm" && (
+              <>
+                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 8 }}>Bloquer {targetName} ?</p>
+                <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
+                  Cette personne ne pourra plus voir ton profil ni te contacter. Votre match et vos messages seront supprimés.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setView("menu")} style={{ ...menuBtnStyle, flex: 1, justifyContent: "center" }}>Annuler</button>
+                  <button onClick={confirmBlock} disabled={busy} style={{
+                    flex: 1, padding: "11px 0", borderRadius: 12, cursor: "pointer",
+                    background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 13.5, fontWeight: 600, opacity: busy ? 0.6 : 1,
+                  }}>{busy ? "..." : "Bloquer"}</button>
+                </div>
+              </>
+            )}
+
+            {view === "done" && (
+              <>
+                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 8 }}>Signalement envoyé</p>
+                <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 16 }}>Merci, notre équipe va l'examiner.</p>
+                <button onClick={close} style={{
+                  width: "100%", padding: "11px 0", borderRadius: 12, cursor: "pointer",
+                  background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13.5,
+                }}>Fermer</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+const menuBtnStyle = {
+  display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 4px", marginBottom: 2,
+  background: "none", border: "none", color: "#FBEFE9", fontSize: 14, cursor: "pointer", textAlign: "left",
+};
+
+function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
   const cardRef = useRef(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const start = useRef({ x: 0, y: 0 });
@@ -153,6 +300,11 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex }) {
           backdropFilter: "blur(4px)", whiteSpace: "nowrap",
         }}>{profile.intention}</div>
       ) : null}
+      {isTop && (
+        <div style={{ position: "absolute", top: photos.length > 1 ? 22 : 14, right: 14, zIndex: 5 }}>
+          <ReportBlockMenu targetId={profile.id} targetName={profile.name} onBlocked={() => onBlocked?.(profile.id)} />
+        </div>
+      )}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "20px 22px" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
@@ -425,6 +577,7 @@ function DiscoverScreen({ onNewMatch }) {
             isTop={i === deck.slice(0, 3).length - 1}
             zIndex={i}
             onSwipe={swipe}
+            onBlocked={(id) => setDeck((d) => d.filter((x) => x.id !== id))}
           />
         ))}
         {spark && (
@@ -690,7 +843,8 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
           <ArrowLeft size={20} />
         </button>
         <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-        <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600 }}>{conversation.name}</span>
+        <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, flex: 1 }}>{conversation.name}</span>
+        <ReportBlockMenu targetId={conversation.id} targetName={conversation.name} iconColor="#8C7A94" onBlocked={onBack} />
       </div>
       <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}>
         {loading && <p style={{ color: "#B39FBF", fontSize: 13, textAlign: "center" }}>Chargement...</p>}
