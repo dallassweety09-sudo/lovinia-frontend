@@ -12,7 +12,8 @@ const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
 // Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
-const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com"
+
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -561,6 +562,19 @@ function MatchesScreen({ matches, onOpenChat }) {
   );
 }
 
+function formatMessageTime(iso) {
+  if (!iso) return "";
+  const date = new Date(iso + "Z"); // SQLite CURRENT_TIMESTAMP is UTC without timezone marker
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMin = diffMs / 60000;
+  if (diffMin < 1) return "à l'instant";
+  if (diffMin < 60) return `${Math.floor(diffMin)} min`;
+  if (diffMin < 24 * 60) return `${Math.floor(diffMin / 60)} h`;
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: sameYear ? undefined : "2-digit" });
+}
+
 function MessagesScreen({ conversations, onOpenChat }) {
   const [remoteList, setRemoteList] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE);
@@ -574,7 +588,9 @@ function MessagesScreen({ conversations, onOpenChat }) {
         const data = await res.json();
         setRemoteList((data.matches || []).map((m) => ({
           id: m.id, matchId: m.match_id, name: m.name, img: m.img,
-          lastMsg: "Dites bonjour !", time: "", unread: false,
+          lastMsg: m.last_message || "Dites bonjour !",
+          time: formatMessageTime(m.last_message_at),
+          unread: (m.unread_count || 0) > 0,
         })));
       } catch {
         setRemoteList([]);
@@ -1556,6 +1572,25 @@ function MainApp() {
   const [conversations, setConversations] = useState(CONVERSATIONS);
   const [activeChat, setActiveChat] = useState(null);
   const [matchToast, setMatchToast] = useState(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    if (!API_BASE || !user) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/notifications/summary`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!cancelled) setUnreadMessages(data.unreadMessages || 0);
+      } catch {
+        // Silencieux : le badge reste juste sur son ancienne valeur en cas de coupure réseau.
+      }
+    };
+    poll();
+    const interval = setInterval(poll, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user, tab, activeChat]);
 
   const handleNewMatch = (profile) => {
     setMatches((m) => (m.find((x) => x.id === profile.id) ? m : [...m, profile]));
@@ -1626,10 +1661,20 @@ function MainApp() {
             {tabs.map(({ id, icon: Icon, label }) => (
               <button key={id} onClick={() => setTab(id)} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                background: "none", border: "none", cursor: "pointer",
+                background: "none", border: "none", cursor: "pointer", position: "relative",
                 color: tab === id ? "#FF6B5B" : "#8C7A94",
               }}>
-                <Icon size={20} fill={tab === id && id === "discover" ? "#FF6B5B" : "none"} />
+                <div style={{ position: "relative" }}>
+                  <Icon size={20} fill={tab === id && id === "discover" ? "#FF6B5B" : "none"} />
+                  {id === "messages" && unreadMessages > 0 && (
+                    <span style={{
+                      position: "absolute", top: -5, right: -8, background: "#FF6B5B", color: "#FBEFE9",
+                      fontSize: 9.5, fontWeight: 700, borderRadius: 999, minWidth: 15, height: 15,
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px",
+                      border: "1.5px solid #1B1223",
+                    }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                  )}
+                </div>
                 <span style={{ fontSize: 10 }}>{label}</span>
               </button>
             ))}
