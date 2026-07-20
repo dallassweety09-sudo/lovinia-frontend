@@ -1567,12 +1567,31 @@ function AdminScreen() {
 
 function MainApp() {
   const [user, setUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(!!API_BASE);
   const [tab, setTab] = useState("discover");
   const [matches, setMatches] = useState([]);
   const [conversations, setConversations] = useState(CONVERSATIONS);
   const [activeChat, setActiveChat] = useState(null);
   const [matchToast, setMatchToast] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    if (!API_BASE) { setCheckingSession(false); return; }
+    const token = localStorage.getItem("token");
+    if (!token) { setCheckingSession(false); return; }
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error("session invalide");
+        const data = await res.json();
+        setUser({ id: data.user.id, name: data.user.name, email: data.user.email });
+      } catch {
+        localStorage.removeItem("token");
+      } finally {
+        setCheckingSession(false);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!API_BASE || !user) return;
@@ -1642,7 +1661,11 @@ function MainApp() {
         input::placeholder { color: #8C7A94; }
       `}</style>
 
-      {!user ? (
+      {checkingSession ? (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Heart size={30} color="#FF6B5B" fill="#FF6B5B" style={{ opacity: 0.6 }} />
+        </div>
+      ) : !user ? (
         <AuthScreen onAuth={setUser} />
       ) : activeChat ? (
         <ChatScreen conversation={activeChat} currentUserId={user?.id} onBack={() => setActiveChat(null)} onSend={sendMessage} />
@@ -1652,7 +1675,7 @@ function MainApp() {
             {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} />}
             {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
-            {tab === "profile" && <ProfileScreen user={user} onLogout={() => setUser(null)} onAccountDeleted={() => setUser(null)} />}
+            {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); }} />}
           </div>
           <div style={{
             display: "flex", justifyContent: "space-around", padding: "10px 8px 16px",
