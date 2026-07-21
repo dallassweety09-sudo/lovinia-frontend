@@ -344,8 +344,9 @@ const DEFAULT_FILTERS = {
   verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false,
 };
 
-function FiltersPanel({ filters, onChange, onClose }) {
-  const set = (key, val) => onChange({ ...filters, [key]: val });
+function FiltersPanel({ filters, onApply, onClose }) {
+  const [draft, setDraft] = useState(filters);
+  const set = (key, val) => setDraft((d) => ({ ...d, [key]: val }));
   return (
     <div style={{
       position: "absolute", inset: 0, background: "rgba(27,18,35,0.97)", zIndex: 40,
@@ -364,7 +365,7 @@ function FiltersPanel({ filters, onChange, onClose }) {
           {["Tous", "Homme", "Femme"].map((g) => (
             <button key={g} onClick={() => set("genre", g)} style={{
               flex: 1, padding: "9px 0", borderRadius: 12, cursor: "pointer",
-              background: filters.genre === g ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+              background: draft.genre === g ? "#FF6B5B" : "rgba(255,255,255,0.08)",
               color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 13,
             }}>{g}</button>
           ))}
@@ -376,13 +377,13 @@ function FiltersPanel({ filters, onChange, onClose }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           <button onClick={() => set("intention", "Toutes")} style={{
             padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
-            background: filters.intention === "Toutes" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+            background: draft.intention === "Toutes" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
             color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
           }}>Toutes</button>
           {INTENTIONS.map((it) => (
             <button key={it.value} onClick={() => set("intention", it.value)} style={{
               padding: "8px 12px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
-              background: filters.intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+              background: draft.intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
               color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
             }}>{it.emoji} {it.label}</button>
           ))}
@@ -391,23 +392,23 @@ function FiltersPanel({ filters, onChange, onClose }) {
 
       <div style={{ marginBottom: 22 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          Âge : {filters.ageMin} - {filters.ageMax} ans
+          Âge : {draft.ageMin} - {draft.ageMax} ans
         </label>
         <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "center" }}>
-          <input type="range" min={18} max={60} value={filters.ageMin}
-            onChange={(e) => set("ageMin", Math.min(Number(e.target.value), filters.ageMax))}
+          <input type="range" min={18} max={60} value={draft.ageMin}
+            onChange={(e) => set("ageMin", Math.min(Number(e.target.value), draft.ageMax))}
             style={{ flex: 1, accentColor: "#FF6B5B" }} />
-          <input type="range" min={18} max={60} value={filters.ageMax}
-            onChange={(e) => set("ageMax", Math.max(Number(e.target.value), filters.ageMin))}
+          <input type="range" min={18} max={60} value={draft.ageMax}
+            onChange={(e) => set("ageMax", Math.max(Number(e.target.value), draft.ageMin))}
             style={{ flex: 1, accentColor: "#FF6B5B" }} />
         </div>
       </div>
 
       <div style={{ marginBottom: 22 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          Distance max : {filters.distance} km
+          Distance max : {draft.distance} km
         </label>
-        <input type="range" min={1} max={100} value={filters.distance}
+        <input type="range" min={1} max={100} value={draft.distance}
           onChange={(e) => set("distance", Number(e.target.value))}
           style={{ width: "100%", marginTop: 8, accentColor: "#FF6B5B" }} />
       </div>
@@ -415,36 +416,36 @@ function FiltersPanel({ filters, onChange, onClose }) {
       <div style={{ marginBottom: 22, display: "flex", flexDirection: "column", gap: 10 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Filtres avancés</label>
 
-        <button onClick={() => set("verifiedOnly", !filters.verifiedOnly)} style={{
+        <button onClick={() => set("verifiedOnly", !draft.verifiedOnly)} style={{
           display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, cursor: "pointer",
-          background: filters.verifiedOnly ? "rgba(79,168,255,0.15)" : "rgba(255,255,255,0.06)",
-          border: filters.verifiedOnly ? "1px solid rgba(79,168,255,0.4)" : "1px solid rgba(255,255,255,0.12)",
+          background: draft.verifiedOnly ? "rgba(79,168,255,0.15)" : "rgba(255,255,255,0.06)",
+          border: draft.verifiedOnly ? "1px solid rgba(79,168,255,0.4)" : "1px solid rgba(255,255,255,0.12)",
         }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 13.5 }}>
-            <BadgeCheck size={16} color={filters.verifiedOnly ? "#4FA8FF" : "#8C7A94"} /> Profils vérifiés uniquement
+            <BadgeCheck size={16} color={draft.verifiedOnly ? "#4FA8FF" : "#8C7A94"} /> Profils vérifiés uniquement
           </span>
-          <div style={{ width: 34, height: 19, borderRadius: 999, background: filters.verifiedOnly ? "#4FA8FF" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
-            <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: filters.verifiedOnly ? 17 : 2, transition: "left 0.2s" }} />
+          <div style={{ width: 34, height: 19, borderRadius: 999, background: draft.verifiedOnly ? "#4FA8FF" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
+            <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: draft.verifiedOnly ? 17 : 2, transition: "left 0.2s" }} />
           </div>
         </button>
 
-        <button onClick={() => set("commonInterests", !filters.commonInterests)} style={{
+        <button onClick={() => set("commonInterests", !draft.commonInterests)} style={{
           display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, cursor: "pointer",
-          background: filters.commonInterests ? "rgba(255,107,91,0.15)" : "rgba(255,255,255,0.06)",
-          border: filters.commonInterests ? "1px solid rgba(255,107,91,0.4)" : "1px solid rgba(255,255,255,0.12)",
+          background: draft.commonInterests ? "rgba(255,107,91,0.15)" : "rgba(255,255,255,0.06)",
+          border: draft.commonInterests ? "1px solid rgba(255,107,91,0.4)" : "1px solid rgba(255,255,255,0.12)",
         }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 13.5 }}>
-            <Sparkles size={16} color={filters.commonInterests ? "#FF6B5B" : "#8C7A94"} /> Centres d'intérêt communs
+            <Sparkles size={16} color={draft.commonInterests ? "#FF6B5B" : "#8C7A94"} /> Centres d'intérêt communs
           </span>
-          <div style={{ width: 34, height: 19, borderRadius: 999, background: filters.commonInterests ? "#FF6B5B" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
-            <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: filters.commonInterests ? 17 : 2, transition: "left 0.2s" }} />
+          <div style={{ width: 34, height: 19, borderRadius: 999, background: draft.commonInterests ? "#FF6B5B" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
+            <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: draft.commonInterests ? 17 : 2, transition: "left 0.2s" }} />
           </div>
         </button>
 
         <div>
           <label style={{ color: "#8C7A94", fontSize: 11.5 }}>Langue parlée</label>
           <input
-            value={filters.langue} onChange={(e) => set("langue", e.target.value)}
+            value={draft.langue} onChange={(e) => set("langue", e.target.value)}
             placeholder="Ex: Français, Anglais..."
             style={{
               width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
@@ -457,14 +458,14 @@ function FiltersPanel({ filters, onChange, onClose }) {
           <label style={{ color: "#8C7A94", fontSize: 11.5 }}>Taille (cm)</label>
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
             <input
-              type="number" value={filters.tailleMin} onChange={(e) => set("tailleMin", e.target.value)}
+              type="number" value={draft.tailleMin} onChange={(e) => set("tailleMin", e.target.value)}
               placeholder="Min" style={{
                 flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
                 borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none", boxSizing: "border-box",
               }}
             />
             <input
-              type="number" value={filters.tailleMax} onChange={(e) => set("tailleMax", e.target.value)}
+              type="number" value={draft.tailleMax} onChange={(e) => set("tailleMax", e.target.value)}
               placeholder="Max" style={{
                 flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
                 borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none", boxSizing: "border-box",
@@ -474,10 +475,16 @@ function FiltersPanel({ filters, onChange, onClose }) {
         </div>
       </div>
 
-      <button onClick={onClose} style={{
-        marginTop: "auto", marginBottom: 24, padding: "13px 0", borderRadius: 14, cursor: "pointer",
-        background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
-      }}>Appliquer</button>
+      <div style={{ display: "flex", gap: 10, marginTop: "auto", marginBottom: 24 }}>
+        <button onClick={onClose} style={{
+          flex: 1, padding: "13px 0", borderRadius: 14, cursor: "pointer",
+          background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 14,
+        }}>Annuler</button>
+        <button onClick={() => onApply(draft)} style={{
+          flex: 2, padding: "13px 0", borderRadius: 14, cursor: "pointer",
+          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
+        }}>Enregistrer</button>
+      </div>
     </div>
   );
 }
@@ -613,7 +620,7 @@ function DiscoverScreen({ onNewMatch }) {
       )}
 
       {showFilters && (
-        <FiltersPanel filters={filters} onChange={applyFilters} onClose={() => setShowFilters(false)} />
+        <FiltersPanel filters={filters} onApply={applyFilters} onClose={() => setShowFilters(false)} />
       )}
 
       <div style={{ position: "relative", flex: 1, minHeight: 420 }}>
