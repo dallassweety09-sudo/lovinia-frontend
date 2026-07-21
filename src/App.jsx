@@ -12,7 +12,7 @@ const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
 // Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
-const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com"
+const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -339,7 +339,10 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
   );
 }
 
-const DEFAULT_FILTERS = { genre: "Tous", ageMin: 18, ageMax: 45, distance: 50, intention: "Toutes" };
+const DEFAULT_FILTERS = {
+  genre: "Tous", ageMin: 18, ageMax: 45, distance: 50, intention: "Toutes",
+  verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false,
+};
 
 function FiltersPanel({ filters, onChange, onClose }) {
   const set = (key, val) => onChange({ ...filters, [key]: val });
@@ -409,6 +412,68 @@ function FiltersPanel({ filters, onChange, onClose }) {
           style={{ width: "100%", marginTop: 8, accentColor: "#FF6B5B" }} />
       </div>
 
+      <div style={{ marginBottom: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Filtres avancés</label>
+
+        <button onClick={() => set("verifiedOnly", !filters.verifiedOnly)} style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, cursor: "pointer",
+          background: filters.verifiedOnly ? "rgba(79,168,255,0.15)" : "rgba(255,255,255,0.06)",
+          border: filters.verifiedOnly ? "1px solid rgba(79,168,255,0.4)" : "1px solid rgba(255,255,255,0.12)",
+        }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 13.5 }}>
+            <BadgeCheck size={16} color={filters.verifiedOnly ? "#4FA8FF" : "#8C7A94"} /> Profils vérifiés uniquement
+          </span>
+          <div style={{ width: 34, height: 19, borderRadius: 999, background: filters.verifiedOnly ? "#4FA8FF" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
+            <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: filters.verifiedOnly ? 17 : 2, transition: "left 0.2s" }} />
+          </div>
+        </button>
+
+        <button onClick={() => set("commonInterests", !filters.commonInterests)} style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, cursor: "pointer",
+          background: filters.commonInterests ? "rgba(255,107,91,0.15)" : "rgba(255,255,255,0.06)",
+          border: filters.commonInterests ? "1px solid rgba(255,107,91,0.4)" : "1px solid rgba(255,255,255,0.12)",
+        }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 13.5 }}>
+            <Sparkles size={16} color={filters.commonInterests ? "#FF6B5B" : "#8C7A94"} /> Centres d'intérêt communs
+          </span>
+          <div style={{ width: 34, height: 19, borderRadius: 999, background: filters.commonInterests ? "#FF6B5B" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
+            <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: filters.commonInterests ? 17 : 2, transition: "left 0.2s" }} />
+          </div>
+        </button>
+
+        <div>
+          <label style={{ color: "#8C7A94", fontSize: 11.5 }}>Langue parlée</label>
+          <input
+            value={filters.langue} onChange={(e) => set("langue", e.target.value)}
+            placeholder="Ex: Français, Anglais..."
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none", boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ color: "#8C7A94", fontSize: 11.5 }}>Taille (cm)</label>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <input
+              type="number" value={filters.tailleMin} onChange={(e) => set("tailleMin", e.target.value)}
+              placeholder="Min" style={{
+                flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none", boxSizing: "border-box",
+              }}
+            />
+            <input
+              type="number" value={filters.tailleMax} onChange={(e) => set("tailleMax", e.target.value)}
+              placeholder="Max" style={{
+                flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none", boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
       <button onClick={onClose} style={{
         marginTop: "auto", marginBottom: 24, padding: "13px 0", borderRadius: 14, cursor: "pointer",
         background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
@@ -447,7 +512,14 @@ function DiscoverScreen({ onNewMatch }) {
     if (API_BASE) {
       try {
         const token = localStorage.getItem("token");
-        const params = new URLSearchParams({ genre: f.genre, ageMin: f.ageMin, ageMax: f.ageMax, intention: f.intention || "Toutes" });
+        const params = new URLSearchParams({
+          genre: f.genre, ageMin: f.ageMin, ageMax: f.ageMax, intention: f.intention || "Toutes",
+          verifiedOnly: f.verifiedOnly ? "true" : "false",
+          langue: f.langue || "",
+          tailleMin: f.tailleMin || "",
+          tailleMax: f.tailleMax || "",
+          commonInterests: f.commonInterests ? "true" : "false",
+        });
         const res = await fetch(`${API_BASE}/api/discover?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
