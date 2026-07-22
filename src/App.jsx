@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -13,6 +13,7 @@ const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
 // Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
 const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
+
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary n'est pas encore configuré.");
@@ -498,6 +499,9 @@ function DiscoverScreen({ onNewMatch }) {
   const [spark, setSpark] = useState(false);
   const [limits, setLimits] = useState(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [coins, setCoins] = useState(null);
+  const [lastSwiped, setLastSwiped] = useState(null);
+  const [toast, setToast] = useState("");
 
   const loadLimits = useCallback(async () => {
     if (!API_BASE) return;
@@ -511,7 +515,40 @@ function DiscoverScreen({ onNewMatch }) {
     }
   }, []);
 
-  useEffect(() => { loadLimits(); }, [loadLimits]);
+  const loadCoins = useCallback(async () => {
+    if (!API_BASE) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/me/coins`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setCoins(data.coins);
+    } catch {
+      // Silencieux.
+    }
+  }, []);
+
+  useEffect(() => { loadLimits(); loadCoins(); }, [loadLimits, loadCoins]);
+
+  // Demande la position GPS une fois, pour calculer de vraies distances (silencieux si refusé).
+  useEffect(() => {
+    if (!API_BASE || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const token = localStorage.getItem("token");
+          await fetch(`${API_BASE}/api/me`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+          });
+        } catch {
+          // Silencieux.
+        }
+      },
+      () => {}, // refus de géolocalisation : on continue sans distance réelle
+      { timeout: 8000 }
+    );
+  }, []);
 
   const loadProfiles = useCallback(async (f) => {
     setLoading(true);
@@ -526,6 +563,7 @@ function DiscoverScreen({ onNewMatch }) {
           tailleMin: f.tailleMin || "",
           tailleMax: f.tailleMax || "",
           commonInterests: f.commonInterests ? "true" : "false",
+          maxDistance: f.distance || "",
         });
         const res = await fetch(`${API_BASE}/api/discover?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -556,18 +594,29 @@ function DiscoverScreen({ onNewMatch }) {
     loadProfiles(f);
   };
 
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
+  };
+
   const swipe = useCallback(async (dir) => {
     const current = deck[0];
     if (!current) return;
 
-    if (dir === "like" && API_BASE && limits && !limits.unlimited && limits.remaining <= 0) {
+    const isLikeAction = dir === "like" || dir === "superlike";
+    if (isLikeAction && API_BASE && limits && !limits.unlimited && limits.remaining <= 0) {
       setShowPaywall(true);
+      return;
+    }
+    if (dir === "superlike" && API_BASE && coins != null && coins < 10) {
+      showToast("Pas assez de Lovinia Coins pour un Super Like (10 requis).");
       return;
     }
 
     setDeck((d) => d.slice(1));
+    setLastSwiped({ profile: current, action: dir });
 
-    if (dir === "like") {
+    if (isLikeAction) {
       setSpark(true);
       setTimeout(() => setSpark(false), 550);
     }
@@ -578,7 +627,7 @@ function DiscoverScreen({ onNewMatch }) {
         const res = await fetch(`${API_BASE}/api/swipe`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ toUserId: current.id, action: dir === "like" ? "like" : "pass" }),
+          body: JSON.stringify({ toUserId: current.id, action: dir }),
         });
         const data = await res.json();
         if (res.status === 403 && data.code === "LIKE_LIMIT_REACHED") {
@@ -586,8 +635,13 @@ function DiscoverScreen({ onNewMatch }) {
           setLimits((l) => (l ? { ...l, remaining: 0 } : l));
           return;
         }
+        if (res.status === 402 && data.code === "INSUFFICIENT_COINS") {
+          showToast("Pas assez de Lovinia Coins pour un Super Like.");
+          return;
+        }
         if (data.matched) onNewMatch(current);
-        if (dir === "like") setLimits((l) => (l && !l.unlimited ? { ...l, remaining: Math.max(0, l.remaining - 1), used: l.used + 1 } : l));
+        if (isLikeAction) setLimits((l) => (l && !l.unlimited ? { ...l, remaining: Math.max(0, l.remaining - 1), used: l.used + 1 } : l));
+        if (dir === "superlike") setCoins((c) => (c == null ? c : Math.max(0, c - 10)));
       } catch {
         // Silencieux : en cas de coupure réseau, le swipe reste local pour ne pas bloquer l'utilisateur.
       }
@@ -595,7 +649,27 @@ function DiscoverScreen({ onNewMatch }) {
       // Mode démo : on simule un match aléatoire.
       onNewMatch(current);
     }
-  }, [deck, onNewMatch, limits]);
+  }, [deck, onNewMatch, limits, coins]);
+
+  const undoSwipe = useCallback(async () => {
+    if (!lastSwiped) return;
+    if (API_BASE) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/swipe/undo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        setDeck((d) => [data.restored || lastSwiped.profile, ...d]);
+      } catch {
+        setDeck((d) => [lastSwiped.profile, ...d]);
+      }
+    } else {
+      setDeck((d) => [lastSwiped.profile, ...d]);
+    }
+    setLastSwiped(null);
+  }, [lastSwiped]);
 
   return (
     <div style={{ padding: "18px 18px 0", display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
@@ -959,6 +1033,58 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
   );
 }
 
+function VisitorsModal({ onClose }) {
+  const [visitors, setVisitors] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!API_BASE) { setLoading(false); return; }
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/visitors`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        setVisitors(data.visitors || []);
+      } catch {
+        setVisitors([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "75vh", overflowY: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Qui a visité mon profil</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        {!API_BASE && <p style={{ color: "#6B5A73", fontSize: 12.5 }}>Connecte le backend pour voir tes visiteurs.</p>}
+        {API_BASE && loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+        {API_BASE && !loading && visitors?.length === 0 && (
+          <p style={{ color: "#B39FBF", fontSize: 13 }}>Personne n'a encore visité ton profil.</p>
+        )}
+        {visitors?.map((v) => (
+          <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <img src={v.img} alt={v.name} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+            <div style={{ flex: 1 }}>
+              <p style={{ color: "#FBEFE9", fontSize: 14, fontWeight: 600, margin: 0 }}>{v.name}, {v.age}</p>
+              <p style={{ color: "#8C7A94", fontSize: 11.5, margin: 0 }}>{formatMessageTime(v.visited_at)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [name, setName] = useState(user?.name || "Toi");
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
@@ -973,6 +1099,9 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [invisible, setInvisible] = useState(false);
+  const [invisibleSaving, setInvisibleSaving] = useState(false);
+  const [showVisitors, setShowVisitors] = useState(false);
   const verifInputRef = useRef(null);
 
   useEffect(() => {
@@ -988,12 +1117,32 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setIntention(data.user.intention || "");
           setPhotos(data.user.photos || []);
           setVerificationStatus(data.user.verification_status || "none");
+          setInvisible(!!data.user.invisible);
         }
       } catch {
         // Silencieux : on garde les valeurs par défaut si le chargement échoue.
       }
     })();
   }, []);
+
+  const toggleInvisible = async () => {
+    const next = !invisible;
+    setInvisible(next);
+    setInvisibleSaving(true);
+    if (API_BASE) {
+      try {
+        const token = localStorage.getItem("token");
+        await fetch(`${API_BASE}/api/me`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ invisible: next }),
+        });
+      } catch {
+        setInvisible(!next);
+      }
+    }
+    setInvisibleSaving(false);
+  };
 
   const submitSelfie = async (e) => {
     const file = e.target.files?.[0];
@@ -1173,8 +1322,36 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       )}
 
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 14, fontWeight: 600 }}>
+            <EyeOff size={17} color={invisible ? "#F2B84B" : "#8C7A94"} /> Mode invisible
+          </span>
+          <button onClick={toggleInvisible} disabled={invisibleSaving || !API_BASE} style={{
+            width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer",
+            background: invisible ? "#F2B84B" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s",
+          }}>
+            <div style={{ width: 17, height: 17, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: invisible ? 21 : 2, transition: "left 0.2s" }} />
+          </button>
+        </div>
+        <p style={{ color: "#B39FBF", fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+          {invisible ? "Ton profil n'apparaît plus dans Découvrir pour les autres." : "Active pour naviguer sans apparaître aux autres."}
+        </p>
+      </div>
+
+      <button onClick={() => setShowVisitors(true)} style={{
+        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Eye size={16} color="#8C7A94" /> Qui a visité mon profil</span>
+        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+      </button>
+
+      {showVisitors && <VisitorsModal onClose={() => setShowVisitors(false)} />}
+
+      <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <p style={{ color: "#D8C4D0", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          L'ajout de photos est disponible dès maintenant. Le badge de vérification d'identité (selfie) et les paramètres de confidentialité avancés arrivent dans une prochaine itération.
+          L'ajout de photos, le mode invisible et les visiteurs sont disponibles dès maintenant. La vérification d'identité par selfie est déjà active un peu plus haut.
         </p>
       </div>
 
