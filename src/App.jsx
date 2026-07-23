@@ -959,6 +959,7 @@ function btnCircle(bg, fg, size) {
 function MatchesScreen({ matches, onOpenChat }) {
   const [remoteMatches, setRemoteMatches] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE);
+  const [viewingProfile, setViewingProfile] = useState(null);
 
   useEffect(() => {
     if (!API_BASE) return;
@@ -990,7 +991,7 @@ function MatchesScreen({ matches, onOpenChat }) {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
           {list.map((m) => (
-            <div key={m.id} onClick={() => onOpenChat(m)} style={{
+            <div key={m.id} onClick={() => setViewingProfile(m)} style={{
               position: "relative", borderRadius: 16, overflow: "hidden", aspectRatio: "3/4", cursor: "pointer",
             }}>
               <img src={m.img} alt={m.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1001,9 +1002,20 @@ function MatchesScreen({ matches, onOpenChat }) {
                 position: "absolute", bottom: 10, left: 12, color: "#FBEFE9",
                 fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600,
               }}>{m.name}</span>
+              <button onClick={(e) => { e.stopPropagation(); onOpenChat(m); }} style={{
+                position: "absolute", top: 8, right: 8, background: "rgba(27,18,35,0.7)", border: "none",
+                borderRadius: "50%", width: 30, height: 30, color: "#FBEFE9", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}><MessageCircle size={15} /></button>
             </div>
           ))}
         </div>
+      )}
+      {viewingProfile && (
+        <ProfileDetailModal
+          userId={viewingProfile.id}
+          onClose={() => setViewingProfile(null)}
+        />
       )}
     </div>
   );
@@ -1088,6 +1100,7 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
   const [messages, setMessages] = useState(conversation.messages || []);
   const [loading, setLoading] = useState(!!API_BASE && !!conversation.matchId);
   const [showGiftGallery, setShowGiftGallery] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     if (!API_BASE || !conversation.matchId) return;
@@ -1161,13 +1174,22 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#FBEFE9", cursor: "pointer", display: "flex" }}>
           <ArrowLeft size={20} />
         </button>
-        <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-        <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, flex: 1 }}>{conversation.name}</span>
+        <button onClick={() => setShowProfile(true)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+          <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+          <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600 }}>{conversation.name}</span>
+        </button>
         <button onClick={() => setShowGiftGallery(true)} style={{ background: "none", border: "none", color: "#F2B84B", cursor: "pointer", display: "flex" }}>
           <Gift size={19} />
         </button>
         <ReportBlockMenu targetId={conversation.id} targetName={conversation.name} iconColor="#8C7A94" onBlocked={onBack} />
       </div>
+      {showProfile && (
+        <ProfileDetailModal
+          userId={conversation.id}
+          onClose={() => setShowProfile(false)}
+          onOpenGallery={() => { setShowProfile(false); setShowGiftGallery(true); }}
+        />
+      )}
       {showGiftGallery && (
         <GalleryModal userId={conversation.id} userName={conversation.name} currentUserId={currentUserId} onClose={() => setShowGiftGallery(false)} />
       )}
@@ -1206,6 +1228,118 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
         <button onClick={send} style={btnCircle("#FF6B5B", "#FBEFE9", 40)}>
           <Send size={16} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileDetailModal({ userId, onClose, onOpenGallery }) {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [photoIndex, setPhotoIndex] = useState(0);
+
+  useEffect(() => {
+    if (!API_BASE) { setLoading(false); return; }
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/users/${userId}/profile`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Impossible de charger ce profil.");
+        setProfile(data.profile);
+      } catch (e) {
+        setError(e.message || "Impossible de charger ce profil.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [userId]);
+
+  const photos = profile?.photos?.length ? profile.photos : (profile?.img ? [profile.img] : []);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#1B1223", zIndex: 220, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: "#2A1B33" }}>
+        <button onClick={onClose} style={{
+          position: "absolute", top: 16, left: 16, zIndex: 5, background: "rgba(27,18,35,0.7)", border: "none",
+          borderRadius: "50%", width: 34, height: 34, color: "#FBEFE9", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        }}><ArrowLeft size={18} /></button>
+
+        {photos.length > 0 && (
+          <img src={photos[Math.min(photoIndex, photos.length - 1)]} alt={profile?.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
+        {photos.length > 1 && (
+          <>
+            <div style={{ position: "absolute", top: 10, left: 10, right: 10, display: "flex", gap: 4 }}>
+              {photos.map((_, i) => (
+                <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === photoIndex ? "#FBEFE9" : "rgba(255,255,255,0.35)" }} />
+              ))}
+            </div>
+            <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+              <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setPhotoIndex((i) => Math.max(0, i - 1))} />
+              <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setPhotoIndex((i) => Math.min(photos.length - 1, i + 1))} />
+            </div>
+          </>
+        )}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(27,18,35,0.9) 0%, transparent 40%)", pointerEvents: "none" }} />
+      </div>
+
+      <div style={{ padding: "18px 22px 40px" }}>
+        {loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+        {error && <p style={{ color: "#FF6B5B", fontSize: 13 }}>{error}</p>}
+        {profile && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "Fraunces, serif", fontSize: 26, fontWeight: 700, color: "#FBEFE9" }}>{profile.name}, {profile.age}</span>
+              {profile.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13.5 }}>
+              <MapPin size={14} /> {profile.city}{profile.profession ? ` · ${profile.profession}` : ""}{profile.taille ? ` · ${profile.taille} cm` : ""}
+            </div>
+
+            {profile.intention && (
+              <div style={{
+                display: "inline-block", marginTop: 12, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 999, padding: "6px 14px", color: "#FBEFE9", fontSize: 12.5, fontWeight: 600,
+              }}>{profile.intention}</div>
+            )}
+
+            {profile.bio && (
+              <p style={{ color: "#F0E3EC", fontSize: 14.5, lineHeight: 1.6, marginTop: 16 }}>{profile.bio}</p>
+            )}
+
+            {profile.interests?.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Centres d'intérêt</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {profile.interests.map((it) => (
+                    <span key={it} style={{ fontSize: 12.5, padding: "6px 12px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)" }}>{it}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {profile.langues?.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <p style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Langues parlées</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {profile.langues.map((l) => (
+                    <span key={l} style={{ fontSize: 12.5, padding: "6px 12px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)" }}>{l}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {onOpenGallery && (
+              <button onClick={onOpenGallery} style={{
+                marginTop: 20, width: "100%", padding: "12px 0", borderRadius: 14, cursor: "pointer",
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}><Video size={15} /> Voir ses publications</button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -2377,9 +2511,87 @@ const fieldInput = {
 function AdminScreen() {
   const [adminKey, setAdminKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
+  const [adminTab, setAdminTab] = useState("verifications");
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [gifts, setGifts] = useState([]);
+  const [commissionPercent, setCommissionPercent] = useState(30);
+  const [giftsLoading, setGiftsLoading] = useState(false);
+  const [giftStats, setGiftStats] = useState(null);
+  const [newGift, setNewGift] = useState({ emoji: "", name: "", cost: "" });
+
+  const loadGifts = async (key) => {
+    setGiftsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/gifts`, { headers: { "x-admin-key": key } });
+      const data = await res.json();
+      setGifts(data.gifts || []);
+      setCommissionPercent(data.commissionPercent ?? 30);
+      const statsRes = await fetch(`${API_BASE}/api/admin/gifts-stats`, { headers: { "x-admin-key": key } });
+      setGiftStats(await statsRes.json());
+    } catch {
+      // Silencieux : l'admin peut changer d'onglet et réessayer.
+    } finally {
+      setGiftsLoading(false);
+    }
+  };
+
+  const saveCommission = async () => {
+    try {
+      await fetch(`${API_BASE}/api/admin/gift-commission`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ percent: Number(commissionPercent) }),
+      });
+    } catch {
+      // Silencieux.
+    }
+  };
+
+  const createGift = async () => {
+    if (!newGift.emoji || !newGift.name || !newGift.cost) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/gifts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ ...newGift, cost: Number(newGift.cost) }),
+      });
+      const data = await res.json();
+      if (data.gift) setGifts((g) => [...g, data.gift]);
+      setNewGift({ emoji: "", name: "", cost: "" });
+    } catch {
+      // Silencieux.
+    }
+  };
+
+  const updateGift = async (id, patch) => {
+    setGifts((g) => g.map((it) => it.id === id ? { ...it, ...patch } : it));
+    try {
+      await fetch(`${API_BASE}/api/admin/gifts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      // Silencieux.
+    }
+  };
+
+  const removeGift = async (id) => {
+    setGifts((g) => g.filter((it) => it.id !== id));
+    try {
+      await fetch(`${API_BASE}/api/admin/gifts/${id}`, { method: "DELETE", headers: { "x-admin-key": adminKey } });
+    } catch {
+      // Silencieux.
+    }
+  };
+
+  useEffect(() => {
+    if (unlocked && adminTab === "gifts" && gifts.length === 0 && !giftsLoading) {
+      loadGifts(adminKey);
+    }
+  }, [adminTab, unlocked]);
 
   const load = async (key) => {
     setLoading(true);
@@ -2449,37 +2661,135 @@ function AdminScreen() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#1B1223", padding: 24, fontFamily: "Inter, sans-serif" }}>
-      <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 20 }}>
-        Vérifications en attente ({pending.length})
-      </p>
-      {pending.length === 0 && <p style={{ color: "#B39FBF" }}>Aucune demande en attente pour le moment.</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-        {pending.map((u) => (
-          <div key={u.id} style={{ background: "#2A1B33", borderRadius: 14, padding: 16 }}>
-            <p style={{ color: "#FBEFE9", fontWeight: 600, marginBottom: 4 }}>{u.name} <span style={{ color: "#8C7A94", fontWeight: 400 }}>({u.email})</span></p>
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Selfie soumis</p>
-                <img src={u.verification_selfie} alt="Selfie" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Photo de profil</p>
-                <img src={u.photos?.[0] || u.img} alt="Profil" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button onClick={() => decide(u.id, false)} style={{
-                flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
-                background: "rgba(255,107,91,0.15)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 13,
-              }}>Refuser</button>
-              <button onClick={() => decide(u.id, true)} style={{
-                flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
-                background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)", fontSize: 13,
-              }}>Valider</button>
-            </div>
-          </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        {[{ v: "verifications", l: `Vérifications (${pending.length})` }, { v: "gifts", l: "Cadeaux" }].map((t) => (
+          <button key={t.v} onClick={() => setAdminTab(t.v)} style={{
+            padding: "9px 16px", borderRadius: 999, cursor: "pointer", fontSize: 13,
+            background: adminTab === t.v ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+            color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+          }}>{t.l}</button>
         ))}
       </div>
+
+      {adminTab === "verifications" && (
+        <>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 22, marginBottom: 16 }}>
+            Vérifications en attente
+          </p>
+          {pending.length === 0 && <p style={{ color: "#B39FBF" }}>Aucune demande en attente pour le moment.</p>}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+            {pending.map((u) => (
+              <div key={u.id} style={{ background: "#2A1B33", borderRadius: 14, padding: 16 }}>
+                <p style={{ color: "#FBEFE9", fontWeight: 600, marginBottom: 4 }}>{u.name} <span style={{ color: "#8C7A94", fontWeight: 400 }}>({u.email})</span></p>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Selfie soumis</p>
+                    <img src={u.verification_selfie} alt="Selfie" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Photo de profil</p>
+                    <img src={u.photos?.[0] || u.img} alt="Profil" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button onClick={() => decide(u.id, false)} style={{
+                    flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
+                    background: "rgba(255,107,91,0.15)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 13,
+                  }}>Refuser</button>
+                  <button onClick={() => decide(u.id, true)} style={{
+                    flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
+                    background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)", fontSize: 13,
+                  }}>Valider</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {adminTab === "gifts" && (
+        <>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 22, marginBottom: 16 }}>Boutique de cadeaux</p>
+
+          {giftStats && (
+            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+              {[
+                { l: "Cadeaux envoyés", v: giftStats.totalSent },
+                { l: "Coins dépensés", v: giftStats.totalCoinsSpent },
+                { l: "Commission Lovinia", v: giftStats.totalCommission },
+              ].map((s) => (
+                <div key={s.l} style={{ background: "#2A1B33", borderRadius: 12, padding: "12px 18px" }}>
+                  <p style={{ color: "#8C7A94", fontSize: 11, margin: 0 }}>{s.l}</p>
+                  <p style={{ color: "#F2B84B", fontSize: 20, fontWeight: 700, margin: "2px 0 0" }}>{s.v}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ background: "#2A1B33", borderRadius: 14, padding: 16, marginBottom: 20, maxWidth: 340 }}>
+            <p style={{ color: "#FBEFE9", fontSize: 13.5, fontWeight: 600, marginBottom: 10 }}>Commission Lovinia (%)</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="number" min={0} max={100} value={commissionPercent}
+                onChange={(e) => setCommissionPercent(e.target.value)}
+                style={{
+                  flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: 10, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none",
+                }}
+              />
+              <button onClick={saveCommission} style={{
+                padding: "0 18px", borderRadius: 10, cursor: "pointer",
+                background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 13, fontWeight: 600,
+              }}>Enregistrer</button>
+            </div>
+          </div>
+
+          <div style={{ background: "#2A1B33", borderRadius: 14, padding: 16, marginBottom: 20, maxWidth: 420 }}>
+            <p style={{ color: "#FBEFE9", fontSize: 13.5, fontWeight: 600, marginBottom: 10 }}>Ajouter un cadeau</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input placeholder="Emoji" value={newGift.emoji} onChange={(e) => setNewGift((g) => ({ ...g, emoji: e.target.value }))}
+                style={{ width: 56, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: "#FBEFE9", fontSize: 15, padding: "9px 8px", outline: "none", textAlign: "center" }} />
+              <input placeholder="Nom" value={newGift.name} onChange={(e) => setNewGift((g) => ({ ...g, name: e.target.value }))}
+                style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none" }} />
+              <input placeholder="Coût" type="number" value={newGift.cost} onChange={(e) => setNewGift((g) => ({ ...g, cost: e.target.value }))}
+                style={{ width: 80, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: "#FBEFE9", fontSize: 13, padding: "9px 12px", outline: "none" }} />
+              <button onClick={createGift} style={{
+                padding: "0 14px", borderRadius: 10, cursor: "pointer",
+                background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 13, fontWeight: 600,
+              }}>+</button>
+            </div>
+          </div>
+
+          {giftsLoading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+            {gifts.map((g) => (
+              <div key={g.id} style={{ background: "#2A1B33", borderRadius: 12, padding: 14, opacity: g.active ? 1 : 0.5 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 24 }}>{g.emoji}</span>
+                  <input
+                    value={g.name} onChange={(e) => updateGift(g.id, { name: e.target.value })}
+                    style={{ flex: 1, background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9", fontSize: 13, padding: "3px 0", outline: "none" }}
+                  />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  <Coins size={13} color="#F2B84B" />
+                  <input
+                    type="number" value={g.cost} onChange={(e) => updateGift(g.id, { cost: Number(e.target.value) })}
+                    style={{ width: 70, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "#FBEFE9", fontSize: 12.5, padding: "5px 8px", outline: "none" }}
+                  />
+                  <button onClick={() => updateGift(g.id, { active: g.active ? 0 : 1 })} style={{
+                    marginLeft: "auto", fontSize: 11, padding: "5px 10px", borderRadius: 8, cursor: "pointer",
+                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: g.active ? "#6BE0A8" : "#8C7A94",
+                  }}>{g.active ? "Actif" : "Désactivé"}</button>
+                  <button onClick={() => removeGift(g.id)} style={{ background: "none", border: "none", color: "#FF6B5B", cursor: "pointer", display: "flex" }}>
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
