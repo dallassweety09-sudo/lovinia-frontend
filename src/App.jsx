@@ -1004,6 +1004,30 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
   }, [conversation.matchId]);
 
   const isMine = (m) => (API_BASE ? m.sender_id === currentUserId : m.from === "me");
+  const lastMineIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (isMine(messages[i])) return i;
+    }
+    return -1;
+  })();
+
+  // Rafraîchit périodiquement pour savoir si l'autre personne a lu nos messages.
+  useEffect(() => {
+    if (!API_BASE || !conversation.matchId) return;
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/matches/${conversation.matchId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.messages) setMessages(data.messages);
+      } catch {
+        // Silencieux : on retentera au prochain intervalle.
+      }
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [conversation.matchId]);
 
   const send = async () => {
     const value = text.trim();
@@ -1045,11 +1069,17 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
           </p>
         )}
         {messages.map((m, i) => (
-          <div key={i} style={{
-            alignSelf: isMine(m) ? "flex-end" : "flex-start",
-            background: isMine(m) ? "#FF6B5B" : "rgba(255,255,255,0.1)",
-            color: "#FBEFE9", padding: "9px 14px", borderRadius: 16, maxWidth: "75%", fontSize: 14,
-          }}>{m.text}</div>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: isMine(m) ? "flex-end" : "flex-start" }}>
+            <div style={{
+              background: isMine(m) ? "#FF6B5B" : "rgba(255,255,255,0.1)",
+              color: "#FBEFE9", padding: "9px 14px", borderRadius: 16, maxWidth: "75%", fontSize: 14,
+            }}>{m.text}</div>
+            {isMine(m) && i === lastMineIndex && (
+              <span style={{ color: "#8C7A94", fontSize: 10.5, marginTop: 3, marginRight: 2 }}>
+                {m.is_read ? "Vu" : "Envoyé"}
+              </span>
+            )}
+          </div>
         ))}
       </div>
       <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
