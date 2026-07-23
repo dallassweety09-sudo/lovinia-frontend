@@ -11,8 +11,46 @@ const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
 const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
-// Remplis cette valeur une fois ton projet Google Cloud créé (voir guide fourni).
 const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
+
+// VAPID_PUBLIC_KEY : pour les notifications push. Doit correspondre à la clé publique
+// générée côté backend (variable VAPID_PUBLIC_KEY sur Railway).
+const VAPID_PUBLIC_KEY = "BFP4A7vEFeiSAIEkJ8O9UMbDNBXcqXVaOz9tXchNx_KhWjhm2JIjuwf9mK0vJ1D6HauoPi2T2IHvDIzBthor3YI";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function enablePushNotifications() {
+  if (!API_BASE || !VAPID_PUBLIC_KEY) throw new Error("Notifications non configurées.");
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    throw new Error("Ton navigateur ne supporte pas les notifications push.");
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("Permission refusée.");
+
+  const registration = await navigator.serviceWorker.register("/service-worker.js");
+  await navigator.serviceWorker.ready;
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  const token = localStorage.getItem("token");
+  await fetch(`${API_BASE}/api/push/subscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ subscription }),
+  });
+  return true;
+}
 
 async function uploadPhotoToCloudinary(file) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
@@ -1102,6 +1140,20 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [invisible, setInvisible] = useState(false);
   const [invisibleSaving, setInvisibleSaving] = useState(false);
   const [showVisitors, setShowVisitors] = useState(false);
+  const [pushStatus, setPushStatus] = useState("idle"); // "idle" | "enabling" | "enabled" | "error"
+  const [pushError, setPushError] = useState("");
+
+  const handleEnablePush = async () => {
+    setPushStatus("enabling");
+    setPushError("");
+    try {
+      await enablePushNotifications();
+      setPushStatus("enabled");
+    } catch (e) {
+      setPushError(e.message || "Impossible d'activer les notifications.");
+      setPushStatus("error");
+    }
+  };
   const verifInputRef = useRef(null);
 
   useEffect(() => {
@@ -1346,6 +1398,23 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Eye size={16} color="#8C7A94" /> Qui a visité mon profil</span>
         <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
       </button>
+
+      <button
+        onClick={handleEnablePush}
+        disabled={pushStatus === "enabling" || pushStatus === "enabled" || !API_BASE}
+        style={{
+          marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: pushStatus === "enabled" ? "default" : "pointer",
+          background: pushStatus === "enabled" ? "rgba(107,224,168,0.12)" : "rgba(255,255,255,0.06)",
+          border: pushStatus === "enabled" ? "1px solid rgba(107,224,168,0.4)" : "1px solid rgba(255,255,255,0.12)",
+          color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <BadgeCheck size={16} color={pushStatus === "enabled" ? "#6BE0A8" : "#8C7A94"} />
+          {pushStatus === "enabled" ? "Notifications activées ✓" : pushStatus === "enabling" ? "Activation..." : "Activer les notifications push"}
+        </span>
+      </button>
+      {pushError && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{pushError}</p>}
 
       {showVisitors && <VisitorsModal onClose={() => setShowVisitors(false)} />}
 
