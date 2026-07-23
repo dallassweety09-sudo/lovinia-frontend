@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Gift, Wallet, Video, Plus, Coins } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -15,7 +15,7 @@ const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.goo
 
 // VAPID_PUBLIC_KEY : pour les notifications push. Doit correspondre à la clé publique
 // générée côté backend (variable VAPID_PUBLIC_KEY sur Railway).
-const VAPID_PUBLIC_KEY = "BEeHZ8XqHqavRyWlvWcRAJDnn5xKNppv_IjhsJ8jR3QmN_aWw4vtNAbU-OeOUR--O1Z2ocF5qb_LH_kuuQahlCw";
+const VAPID_PUBLIC_KEY = "BFP4A7vEFeiSAIEkJ8O9UMbDNBXcqXVaOz9tXchNx_KhWjhm2JIjuwf9mK0vJ1D6HauoPi2T2IHvDIzBthor3YI";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -68,6 +68,22 @@ async function uploadPhotoToCloudinary(file) {
   return data.secure_url;
 }
 
+async function uploadVideoToCloudinary(file) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error("Cloudinary n'est pas encore configuré.");
+  }
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || "Échec de l'envoi de la vidéo.");
+  return data.secure_url;
+}
+
 const INTENTIONS = [
   { value: "❤️ Relation sérieuse", emoji: "❤️", label: "Relation sérieuse" },
   { value: "💕 Rencontres sans prise de tête", emoji: "💕", label: "Sans prise de tête" },
@@ -99,6 +115,93 @@ const CONVERSATIONS = [
       { from: "them", text: "Haha trop drôle 😂" },
     ] },
 ];
+
+function GiftPicker({ recipientId, recipientName, mediaId, onClose, onSent }) {
+  const [gifts, setGifts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [sentGift, setSentGift] = useState(null);
+
+  useEffect(() => {
+    if (!API_BASE) { setLoading(false); return; }
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/gifts/catalog`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        setGifts(data.gifts || []);
+      } catch {
+        setError("Impossible de charger la boutique.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const send = async (gift) => {
+    setSending(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/gifts/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ giftTypeId: gift.id, recipientId, mediaId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'envoi.");
+      setSentGift(gift);
+      onSent?.(gift);
+      setTimeout(() => onClose(), 1400);
+    } catch (e) {
+      setError(e.message || "Échec de l'envoi.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "75vh", overflowY: "auto", position: "relative",
+      }}>
+        {sentGift ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "30px 0" }}>
+            <span style={{ fontSize: 56, animation: "sparkPop 0.6s ease-out" }}>{sentGift.emoji}</span>
+            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginTop: 10 }}>
+              {sentGift.name} envoyé à {recipientName} !
+            </p>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, margin: 0 }}>Envoyer un cadeau</p>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            {loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+            {error && <p style={{ color: "#FF6B5B", fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {gifts.map((g) => (
+                <button key={g.id} onClick={() => send(g)} disabled={sending} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 6px", borderRadius: 14,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", cursor: sending ? "default" : "pointer",
+                  opacity: sending ? 0.6 : 1,
+                }}>
+                  <span style={{ fontSize: 28 }}>{g.emoji}</span>
+                  <span style={{ color: "#FBEFE9", fontSize: 11.5, fontWeight: 600 }}>{g.name}</span>
+                  <span style={{ color: "#F2B84B", fontSize: 11, display: "flex", alignItems: "center", gap: 2 }}>
+                    <Coins size={11} /> {g.cost}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const REPORT_REASONS = ["Faux profil", "Contenu inapproprié", "Harcèlement", "Arnaque / Spam", "Autre"];
 
@@ -853,7 +956,7 @@ function btnCircle(bg, fg, size) {
   };
 }
 
-function MatchesScreen({ matches, onOpenChat, onViewProfile }) {
+function MatchesScreen({ matches, onOpenChat }) {
   const [remoteMatches, setRemoteMatches] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE);
 
@@ -887,7 +990,7 @@ function MatchesScreen({ matches, onOpenChat, onViewProfile }) {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
           {list.map((m) => (
-            <div key={m.id} onClick={() => onViewProfile(m)} style={{
+            <div key={m.id} onClick={() => onOpenChat(m)} style={{
               position: "relative", borderRadius: 16, overflow: "hidden", aspectRatio: "3/4", cursor: "pointer",
             }}>
               <img src={m.img} alt={m.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -980,131 +1083,11 @@ function MessagesScreen({ conversations, onOpenChat }) {
   );
 }
 
-function ProfileDetailScreen({ match, onBack, onMessage }) {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(!!API_BASE && !!match.matchId);
-  const [photoIndex, setPhotoIndex] = useState(0);
-
-  useEffect(() => {
-    if (!API_BASE || !match.matchId) return;
-    (async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/api/matches/${match.matchId}/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Profil introuvable.");
-        setProfile(data.profile);
-      } catch {
-        setProfile(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [match.matchId]);
-
-  // En mode démo (sans backend), on affiche directement les infos déjà connues du match.
-  const p = profile || match;
-  const photos = (p.photos && p.photos.length) ? p.photos : (p.img ? [p.img] : []);
-  const currentPhoto = photos[Math.min(photoIndex, Math.max(photos.length - 1, 0))] || p.img;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
-      <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", flexShrink: 0 }}>
-        <img src={currentPhoto} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{
-          position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(27,18,35,0.92) 0%, rgba(27,18,35,0.1) 55%, rgba(27,18,35,0) 70%)",
-        }} />
-        {photos.length > 1 && (
-          <>
-            <div style={{ position: "absolute", top: 10, left: 10, right: 10, display: "flex", gap: 4 }}>
-              {photos.map((_, i) => (
-                <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === photoIndex ? "#FBEFE9" : "rgba(255,255,255,0.35)" }} />
-              ))}
-            </div>
-            <button onClick={() => setPhotoIndex((i) => Math.max(0, i - 1))} style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "40%", background: "none", border: "none", cursor: "pointer" }} />
-            <button onClick={() => setPhotoIndex((i) => Math.min(photos.length - 1, i + 1))} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "40%", background: "none", border: "none", cursor: "pointer" }} />
-          </>
-        )}
-        <button onClick={onBack} style={{
-          position: "absolute", top: 16, left: 14, background: "rgba(27,18,35,0.55)", border: "none",
-          borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-        }}>
-          <ArrowLeft size={18} color="#FBEFE9" />
-        </button>
-        <div style={{ position: "absolute", top: 16, right: 14 }}>
-          <ReportBlockMenu targetId={p.id} targetName={p.name} onBlocked={onBack} />
-        </div>
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "20px 22px" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontFamily: "Fraunces, serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{p.name}</span>
-            {p.age ? <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#E7D4E0" }}>{p.age}</span> : null}
-            {p.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
-          </div>
-          {(p.city || p.profession) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
-              <MapPin size={13} /> {p.city}{p.profession ? ` · ${p.profession}` : ""}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ padding: "18px 20px 28px" }}>
-        {loading && <p style={{ color: "#B39FBF", fontSize: 13.5, textAlign: "center" }}>Chargement du profil...</p>}
-
-        {p.intention && (
-          <div style={{
-            display: "inline-block", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: 999, padding: "6px 14px", color: "#FBEFE9", fontSize: 12.5, fontWeight: 600, marginBottom: 14,
-          }}>{p.intention}</div>
-        )}
-
-        {p.bio && (
-          <p style={{ color: "#F0E3EC", fontSize: 14.5, lineHeight: 1.6, marginBottom: 16 }}>{p.bio}</p>
-        )}
-
-        {p.taille ? (
-          <p style={{ color: "#B39FBF", fontSize: 13, marginBottom: 12 }}>Taille : {p.taille} cm</p>
-        ) : null}
-
-        {(p.interests?.length ? p.interests : p.tags || []).length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Centres d'intérêt</p>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {(p.interests?.length ? p.interests : p.tags || []).map((t) => (
-                <span key={t} style={{
-                  fontSize: 12.5, padding: "6px 12px", borderRadius: 999,
-                  background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
-                }}>{t}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {p.langues?.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Langues parlées</p>
-            <p style={{ color: "#D8C4D0", fontSize: 13.5 }}>{p.langues.join(", ")}</p>
-          </div>
-        )}
-
-        <button onClick={onMessage} style={{
-          width: "100%", padding: "14px 0", borderRadius: 16, cursor: "pointer",
-          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}>
-          <MessageCircle size={18} /> Envoyer un message
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile }) {
+function ChatScreen({ conversation, currentUserId, onBack, onSend }) {
   const [text, setText] = useState("");
   const [messages, setMessages] = useState(conversation.messages || []);
   const [loading, setLoading] = useState(!!API_BASE && !!conversation.matchId);
+  const [showGiftGallery, setShowGiftGallery] = useState(false);
 
   useEffect(() => {
     if (!API_BASE || !conversation.matchId) return;
@@ -1125,6 +1108,30 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
   }, [conversation.matchId]);
 
   const isMine = (m) => (API_BASE ? m.sender_id === currentUserId : m.from === "me");
+  const lastMineIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (isMine(messages[i])) return i;
+    }
+    return -1;
+  })();
+
+  // Rafraîchit périodiquement pour savoir si l'autre personne a lu nos messages.
+  useEffect(() => {
+    if (!API_BASE || !conversation.matchId) return;
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/matches/${conversation.matchId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.messages) setMessages(data.messages);
+      } catch {
+        // Silencieux : on retentera au prochain intervalle.
+      }
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [conversation.matchId]);
 
   const send = async () => {
     const value = text.trim();
@@ -1154,15 +1161,16 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#FBEFE9", cursor: "pointer", display: "flex" }}>
           <ArrowLeft size={20} />
         </button>
-        <button
-          onClick={() => onViewProfile?.(conversation)}
-          style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
-        >
-          <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-          <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600 }}>{conversation.name}</span>
+        <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+        <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, flex: 1 }}>{conversation.name}</span>
+        <button onClick={() => setShowGiftGallery(true)} style={{ background: "none", border: "none", color: "#F2B84B", cursor: "pointer", display: "flex" }}>
+          <Gift size={19} />
         </button>
         <ReportBlockMenu targetId={conversation.id} targetName={conversation.name} iconColor="#8C7A94" onBlocked={onBack} />
       </div>
+      {showGiftGallery && (
+        <GalleryModal userId={conversation.id} userName={conversation.name} currentUserId={currentUserId} onClose={() => setShowGiftGallery(false)} />
+      )}
       <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}>
         {loading && <p style={{ color: "#B39FBF", fontSize: 13, textAlign: "center" }}>Chargement...</p>}
         {!loading && messages.length === 0 && (
@@ -1171,11 +1179,17 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
           </p>
         )}
         {messages.map((m, i) => (
-          <div key={i} style={{
-            alignSelf: isMine(m) ? "flex-end" : "flex-start",
-            background: isMine(m) ? "#FF6B5B" : "rgba(255,255,255,0.1)",
-            color: "#FBEFE9", padding: "9px 14px", borderRadius: 16, maxWidth: "75%", fontSize: 14,
-          }}>{m.text}</div>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: isMine(m) ? "flex-end" : "flex-start" }}>
+            <div style={{
+              background: isMine(m) ? "#FF6B5B" : "rgba(255,255,255,0.1)",
+              color: "#FBEFE9", padding: "9px 14px", borderRadius: 16, maxWidth: "75%", fontSize: 14,
+            }}>{m.text}</div>
+            {isMine(m) && i === lastMineIndex && (
+              <span style={{ color: "#8C7A94", fontSize: 10.5, marginTop: 3, marginRight: 2 }}>
+                {m.is_read ? "Vu" : "Envoyé"}
+              </span>
+            )}
+          </div>
         ))}
       </div>
       <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1192,6 +1206,215 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
         <button onClick={send} style={btnCircle("#FF6B5B", "#FBEFE9", 40)}>
           <Send size={16} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+function GalleryModal({ userId, userName, isOwn, currentUserId, onClose }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [giftTarget, setGiftTarget] = useState(null); // media item pour lequel on ouvre le sélecteur de cadeau
+  const photoInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+
+  const load = async () => {
+    if (!API_BASE) { setLoading(false); return; }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/gallery/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setItems(data.items || []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [userId]);
+
+  const handleUpload = async (file, type) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = type === "video" ? await uploadVideoToCloudinary(file) : await uploadPhotoToCloudinary(file);
+      const token = localStorage.getItem("token");
+      await fetch(`${API_BASE}/api/gallery`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ url, type }),
+      });
+      load();
+    } catch {
+      // Silencieux : l'utilisateur peut réessayer.
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const deleteItem = async (itemId) => {
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_BASE}/api/gallery/${itemId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setItems((its) => its.filter((it) => it.id !== itemId));
+    } catch {
+      // Silencieux.
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 250, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "80vh", overflowY: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, margin: 0 }}>
+            {isOwn ? "Mes publications" : `Publications de ${userName}`}
+          </p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        {isOwn && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <button onClick={() => photoInputRef.current?.click()} disabled={uploading} style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 0", borderRadius: 12,
+              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9", fontSize: 12.5, cursor: "pointer",
+            }}><Camera size={14} /> Photo</button>
+            <button onClick={() => videoInputRef.current?.click()} disabled={uploading} style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 0", borderRadius: 12,
+              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9", fontSize: 12.5, cursor: "pointer",
+            }}><Video size={14} /> Vidéo</button>
+            <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleUpload(e.target.files?.[0], "photo")} />
+            <input ref={videoInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={(e) => handleUpload(e.target.files?.[0], "video")} />
+          </div>
+        )}
+        {uploading && <p style={{ color: "#B39FBF", fontSize: 12.5, marginBottom: 10 }}>Envoi en cours...</p>}
+
+        {loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+        {!loading && items.length === 0 && (
+          <p style={{ color: "#B39FBF", fontSize: 13 }}>{isOwn ? "Ajoute une photo ou une vidéo pour commencer." : "Aucune publication pour l'instant."}</p>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+          {items.map((it) => (
+            <div key={it.id} style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "3/4" }}>
+              {it.type === "video" ? (
+                <video src={it.url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted playsInline />
+              ) : (
+                <img src={it.url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              )}
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 10px",
+                background: "linear-gradient(to top, rgba(27,18,35,0.9), transparent)",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#F2B84B", fontSize: 12 }}>
+                  <Gift size={13} /> {it.gift_count || 0}
+                </span>
+                {isOwn ? (
+                  <button onClick={() => deleteItem(it.id)} style={{ background: "none", border: "none", color: "#FF6B5B", cursor: "pointer" }}><X size={15} /></button>
+                ) : (
+                  currentUserId && (
+                    <button onClick={() => setGiftTarget(it)} style={{
+                      background: "rgba(255,107,91,0.9)", border: "none", borderRadius: 999, padding: "4px 9px",
+                      color: "#FBEFE9", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 3,
+                    }}><Gift size={11} /> Offrir</button>
+                  )
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {giftTarget && (
+          <GiftPicker
+            recipientId={userId} recipientName={userName} mediaId={giftTarget.id}
+            onClose={() => setGiftTarget(null)}
+            onSent={() => setItems((its) => its.map((it) => it.id === giftTarget.id ? { ...it, gift_count: (it.gift_count || 0) + 1 } : it))}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WalletModal({ onClose }) {
+  const [wallet, setWallet] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!API_BASE) { setLoading(false); return; }
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/me/wallet`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        setWallet(data);
+      } catch {
+        setWallet(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 250, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "78vh", overflowY: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Mon portefeuille</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        {loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+
+        {wallet && (
+          <>
+            <div style={{ background: "rgba(242,184,75,0.1)", border: "1px solid rgba(242,184,75,0.3)", borderRadius: 14, padding: 16, textAlign: "center" }}>
+              <p style={{ color: "#8C7A94", fontSize: 11.5, margin: 0 }}>Solde disponible</p>
+              <p style={{ color: "#F2B84B", fontSize: 28, fontWeight: 700, fontFamily: "Fraunces, serif", margin: "4px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <Coins size={22} /> {wallet.balance}
+              </p>
+              {wallet.totalEarned > 0 && (
+                <p style={{ color: "#B39FBF", fontSize: 11.5, marginTop: 4 }}>{wallet.totalEarned} Coins gagnés grâce aux cadeaux reçus</p>
+              )}
+            </div>
+
+            {wallet.receivedGifts?.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <p style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Cadeaux reçus</p>
+                {wallet.receivedGifts.map((g) => (
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    <span style={{ fontSize: 22 }}>{g.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ color: "#FBEFE9", fontSize: 13, margin: 0 }}>{g.name} de {g.sender_name}</p>
+                      <p style={{ color: "#8C7A94", fontSize: 11, margin: 0 }}>{formatMessageTime(g.created_at)}</p>
+                    </div>
+                    <span style={{ color: "#F2B84B", fontSize: 12.5 }}>+{g.recipient_share}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {wallet.history?.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <p style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Historique</p>
+                {wallet.history.map((h, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
+                    <span style={{ color: "#D8C4D0", fontSize: 12.5 }}>{h.reason}</span>
+                    <span style={{ color: h.amount >= 0 ? "#6BE0A8" : "#FF6B5B", fontSize: 12.5, fontWeight: 600 }}>
+                      {h.amount >= 0 ? "+" : ""}{h.amount}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -1266,6 +1489,11 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [invisible, setInvisible] = useState(false);
   const [invisibleSaving, setInvisibleSaving] = useState(false);
   const [showVisitors, setShowVisitors] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
+  const [acceptGifts, setAcceptGifts] = useState(true);
+  const [giftRestriction, setGiftRestriction] = useState("everyone");
+  const [hideGiftCount, setHideGiftCount] = useState(false);
   const [pushStatus, setPushStatus] = useState("idle"); // "idle" | "enabling" | "enabled" | "error"
   const [pushError, setPushError] = useState("");
 
@@ -1296,6 +1524,9 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setPhotos(data.user.photos || []);
           setVerificationStatus(data.user.verification_status || "none");
           setInvisible(!!data.user.invisible);
+          setAcceptGifts(data.user.accept_gifts === undefined ? true : !!data.user.accept_gifts);
+          setGiftRestriction(data.user.gift_senders_restriction || "everyone");
+          setHideGiftCount(!!data.user.hide_gift_count);
         }
       } catch {
         // Silencieux : on garde les valeurs par défaut si le chargement échoue.
@@ -1320,6 +1551,24 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       }
     }
     setInvisibleSaving(false);
+  };
+
+  const saveGiftSettings = async (next) => {
+    const merged = { acceptGifts, gift_senders_restriction: giftRestriction, hideGiftCount, ...next };
+    if ("acceptGifts" in next) setAcceptGifts(next.acceptGifts);
+    if ("gift_senders_restriction" in next) setGiftRestriction(next.gift_senders_restriction);
+    if ("hideGiftCount" in next) setHideGiftCount(next.hideGiftCount);
+    if (!API_BASE) return;
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_BASE}/api/me/gift-settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(merged),
+      });
+    } catch {
+      // Silencieux : l'utilisateur peut réessayer.
+    }
   };
 
   const submitSelfie = async (e) => {
@@ -1524,6 +1773,71 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Eye size={16} color="#8C7A94" /> Qui a visité mon profil</span>
         <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
       </button>
+
+      <button onClick={() => setShowGallery(true)} style={{
+        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Video size={16} color="#8C7A94" /> Mes publications</span>
+        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+      </button>
+
+      <button onClick={() => setShowWallet(true)} style={{
+        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Wallet size={16} color="#F2B84B" /> Mon portefeuille (Coins)</span>
+        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+      </button>
+
+      {verificationStatus === "verified" && (
+        <div style={{ marginTop: 12, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
+          <p style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 13.5, fontWeight: 600, margin: 0 }}>
+            <Gift size={16} color="#F2B84B" /> Réception des cadeaux
+          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+            <span style={{ color: "#D8C4D0", fontSize: 12.5 }}>Accepter les cadeaux</span>
+            <button onClick={() => saveGiftSettings({ acceptGifts: !acceptGifts })} style={{
+              width: 34, height: 19, borderRadius: 999, border: "none", cursor: "pointer",
+              background: acceptGifts ? "#F2B84B" : "rgba(255,255,255,0.2)", position: "relative",
+            }}>
+              <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2, left: acceptGifts ? 17 : 2, transition: "left 0.2s" }} />
+            </button>
+          </div>
+          {acceptGifts && (
+            <>
+              <div style={{ marginTop: 12 }}>
+                <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6 }}>Qui peut m'envoyer des cadeaux</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[{ v: "everyone", l: "Tout le monde" }, { v: "verified_only", l: "Profils vérifiés" }].map((opt) => (
+                    <button key={opt.v} onClick={() => saveGiftSettings({ gift_senders_restriction: opt.v })} style={{
+                      flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer", fontSize: 11.5,
+                      background: giftRestriction === opt.v ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                      color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+                    }}>{opt.l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                <span style={{ color: "#D8C4D0", fontSize: 12.5 }}>Masquer le compteur de cadeaux</span>
+                <button onClick={() => saveGiftSettings({ hideGiftCount: !hideGiftCount })} style={{
+                  width: 34, height: 19, borderRadius: 999, border: "none", cursor: "pointer",
+                  background: hideGiftCount ? "#F2B84B" : "rgba(255,255,255,0.2)", position: "relative",
+                }}>
+                  <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2, left: hideGiftCount ? 17 : 2, transition: "left 0.2s" }} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {showGallery && (
+        <GalleryModal userId={user?.id} userName={name} isOwn currentUserId={user?.id} onClose={() => setShowGallery(false)} />
+      )}
+      {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
 
       <button
         onClick={handleEnablePush}
@@ -2177,7 +2491,6 @@ function MainApp() {
   const [matches, setMatches] = useState([]);
   const [conversations, setConversations] = useState(CONVERSATIONS);
   const [activeChat, setActiveChat] = useState(null);
-  const [viewingProfile, setViewingProfile] = useState(null);
   const [matchToast, setMatchToast] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
@@ -2228,7 +2541,6 @@ function MainApp() {
   };
 
   const openChat = (conv) => {
-    setViewingProfile(null);
     if (API_BASE) {
       setActiveChat(conv); // conv vient déjà du backend avec matchId, name, img
     } else {
@@ -2236,8 +2548,6 @@ function MainApp() {
       setActiveChat(full);
     }
   };
-
-  const openProfile = (matchOrConv) => setViewingProfile(matchOrConv);
 
   const sendMessage = (text) => {
     setConversations((cs) => cs.map((c) => c.id === activeChat.id
@@ -2276,15 +2586,13 @@ function MainApp() {
         </div>
       ) : !user ? (
         <AuthScreen onAuth={setUser} />
-      ) : viewingProfile ? (
-        <ProfileDetailScreen match={viewingProfile} onBack={() => setViewingProfile(null)} onMessage={() => openChat(viewingProfile)} />
       ) : activeChat ? (
-        <ChatScreen conversation={activeChat} currentUserId={user?.id} onBack={() => setActiveChat(null)} onSend={sendMessage} onViewProfile={openProfile} />
+        <ChatScreen conversation={activeChat} currentUserId={user?.id} onBack={() => setActiveChat(null)} onSend={sendMessage} />
       ) : (
         <>
           <div style={{ flex: 1, overflowY: "auto" }}>
             {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} />}
-            {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} onViewProfile={openProfile} />}
+            {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
             {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); }} />}
           </div>
