@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -66,6 +66,24 @@ async function uploadPhotoToCloudinary(file) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || "Échec de l'envoi de la photo.");
   return data.secure_url;
+}
+
+// Envoie une photo OU une vidéo vers Cloudinary (utilisé pour les publications du profil).
+async function uploadMediaToCloudinary(file) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error("Cloudinary n'est pas encore configuré.");
+  }
+  const isVideo = file.type?.startsWith("video/");
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${isVideo ? "video" : "image"}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || "Échec de l'envoi du média.");
+  return { url: data.secure_url, mediaType: isVideo ? "video" : "photo" };
 }
 
 const INTENTIONS = [
@@ -980,7 +998,7 @@ function MessagesScreen({ conversations, onOpenChat }) {
   );
 }
 
-function ProfileDetailScreen({ match, onBack, onMessage }) {
+function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE && !!match.matchId);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -1088,6 +1106,8 @@ function ProfileDetailScreen({ match, onBack, onMessage }) {
             <p style={{ color: "#D8C4D0", fontSize: 13.5 }}>{p.langues.join(", ")}</p>
           </div>
         )}
+
+        <UserPostsSection userId={p.id} currentUserId={currentUserId} />
 
         <button onClick={onMessage} style={{
           width: "100%", padding: "14px 0", borderRadius: 16, cursor: "pointer",
@@ -1271,6 +1291,366 @@ function VisitorsModal({ onClose }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onUpdated }) {
+  const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+  const [liked, setLiked] = useState(post.likedByMe);
+  const [likeCount, setLikeCount] = useState(post.likeCount || 0);
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(!!API_BASE);
+  const [commentText, setCommentText] = useState("");
+  const [commentError, setCommentError] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [commentsEnabled, setCommentsEnabled] = useState(post.comments_enabled !== 0);
+  const [commentsPermission, setCommentsPermission] = useState(post.comments_permission || "everyone");
+
+  useEffect(() => {
+    if (!API_BASE) { setLoadingComments(false); return; }
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, { headers: authHeaders() });
+        const data = await res.json();
+        setComments(data.comments || []);
+      } catch {
+        setComments([]);
+      } finally {
+        setLoadingComments(false);
+      }
+    })();
+  }, [post.id]);
+
+  const toggleLike = async () => {
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+    if (!API_BASE) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/posts/${post.id}/like`, { method: "POST", headers: authHeaders() });
+      const data = await res.json();
+      if (typeof data.likeCount === "number") setLikeCount(data.likeCount);
+    } catch {
+      // Silencieux : l'état local reste correct même en cas de coupure ponctuelle.
+    }
+  };
+
+  const submitComment = async () => {
+    const text = commentText.trim();
+    if (!text) return;
+    setCommentError("");
+    if (!API_BASE) {
+      setComments((c) => [...c, { id: Date.now(), text, name: "Toi", user_id: currentUserId }]);
+      setCommentText("");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Impossible d'envoyer le commentaire.");
+      setComments((c) => [...c, data.comment]);
+      setCommentText("");
+    } catch (e) {
+      setCommentError(e.message || "Erreur d'envoi.");
+    }
+  };
+
+  const deleteComment = async (commentId) => {
+    setComments((c) => c.filter((x) => x.id !== commentId));
+    if (!API_BASE) return;
+    try {
+      await fetch(`${API_BASE}/api/posts/${post.id}/comments/${commentId}`, { method: "DELETE", headers: authHeaders() });
+    } catch {
+      // Silencieux.
+    }
+  };
+
+  const deletePost = async () => {
+    if (API_BASE) {
+      try {
+        await fetch(`${API_BASE}/api/posts/${post.id}`, { method: "DELETE", headers: authHeaders() });
+      } catch {
+        // Silencieux.
+      }
+    }
+    onDeleted?.(post.id);
+    onClose();
+  };
+
+  const saveSettings = async (nextEnabled, nextPermission) => {
+    setCommentsEnabled(nextEnabled);
+    setCommentsPermission(nextPermission);
+    if (API_BASE) {
+      try {
+        await fetch(`${API_BASE}/api/posts/${post.id}/settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ commentsEnabled: nextEnabled, commentsPermission: nextPermission }),
+        });
+      } catch {
+        // Silencieux.
+      }
+    }
+    onUpdated?.(post.id, { comments_enabled: nextEnabled ? 1 : 0, comments_permission: nextPermission });
+  };
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 300,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 14,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#1B1223", borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "90vh",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+      }}>
+        <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", background: "#000", flexShrink: 0 }}>
+          {post.media_type === "video" ? (
+            <video src={post.media_url} controls style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <img src={post.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          )}
+          <button onClick={onClose} style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.55)", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <X size={16} color="#FBEFE9" />
+          </button>
+          {isOwner && (
+            <button onClick={() => setShowSettings((s) => !s)} style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.55)", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <Settings size={15} color="#FBEFE9" />
+            </button>
+          )}
+        </div>
+
+        {showSettings && isOwner && (
+          <div style={{ padding: 14, background: "#2A1B33", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <span style={{ color: "#FBEFE9", fontSize: 13 }}>Autoriser les commentaires</span>
+              <button onClick={() => saveSettings(!commentsEnabled, commentsPermission)} style={{
+                width: 36, height: 20, borderRadius: 999, border: "none", cursor: "pointer",
+                background: commentsEnabled ? "#F2B84B" : "rgba(255,255,255,0.2)", position: "relative",
+              }}>
+                <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: commentsEnabled ? 19 : 2, transition: "left 0.2s" }} />
+              </button>
+            </div>
+            {commentsEnabled && (
+              <div style={{ display: "flex", gap: 6 }}>
+                {[{ v: "everyone", l: "Tout le monde" }, { v: "matches", l: "Mes matchs seulement" }].map((opt) => (
+                  <button key={opt.v} onClick={() => saveSettings(commentsEnabled, opt.v)} style={{
+                    flex: 1, padding: "7px 0", borderRadius: 10, fontSize: 11.5, cursor: "pointer",
+                    background: commentsPermission === opt.v ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                    color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+                  }}>{opt.l}</button>
+                ))}
+              </div>
+            )}
+            <button onClick={deletePost} style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, color: "#FF6B5B", background: "none", border: "none", cursor: "pointer", fontSize: 12.5, padding: 0 }}>
+              <Trash2 size={14} /> Supprimer cette publication
+            </button>
+          </div>
+        )}
+
+        <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <button onClick={toggleLike} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <Heart size={20} color={liked ? "#FF6B5B" : "#B39FBF"} fill={liked ? "#FF6B5B" : "none"} />
+            <span style={{ color: "#FBEFE9", fontSize: 13 }}>{likeCount}</span>
+          </button>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#B39FBF", fontSize: 13 }}>
+            <MessageCircle size={18} /> {comments.length}
+          </span>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 16px" }}>
+          {loadingComments && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement des commentaires...</p>}
+          {!loadingComments && comments.length === 0 && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucun commentaire pour l'instant.</p>}
+          {comments.map((c) => (
+            <div key={c.id} style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-start" }}>
+              <img src={c.img} alt={c.name} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0, background: "#3A2645" }} />
+              <p style={{ flex: 1, color: "#FBEFE9", fontSize: 12.5, lineHeight: 1.4 }}>
+                <b>{c.name}</b> <span style={{ color: "#D8C4D0", fontWeight: 400 }}>{c.text}</span>
+              </p>
+              {(c.user_id === currentUserId || isOwner) && (
+                <button onClick={() => deleteComment(c.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#6B5A73", padding: 0 }}>
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          {!commentsEnabled ? (
+            <p style={{ color: "#8C7A94", fontSize: 12 }}>Les commentaires sont désactivés sur cette publication.</p>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={commentText} onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }}
+                  placeholder="Ajouter un commentaire..."
+                  style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20, padding: "9px 14px", color: "#FBEFE9", fontSize: 13, outline: "none" }}
+                />
+                <button onClick={submitComment} style={btnCircle("#FF6B5B", "#FBEFE9", 36)}><Send size={14} /></button>
+              </div>
+              {commentError && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{commentError}</p>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
+  if (posts.length === 0) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+      {posts.map((p) => (
+        <div key={p.id} onClick={() => onOpen(p)} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: "#2A1B33" }}>
+          {p.media_type === "video" ? (
+            <video src={p.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+          ) : (
+            <img src={p.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          )}
+          {p.media_type === "video" && (
+            <div style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.5)", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Play size={11} color="#FBEFE9" fill="#FBEFE9" />
+            </div>
+          )}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)", padding: "12px 6px 5px", display: "flex", gap: 8 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 3, color: "#FBEFE9", fontSize: 10.5 }}>
+              <Heart size={10} fill={p.likedByMe ? "#FF6B5B" : "none"} color={p.likedByMe ? "#FF6B5B" : "#FBEFE9"} /> {p.likeCount}
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 3, color: "#FBEFE9", fontSize: 10.5 }}>
+              <MessageCircle size={10} /> {p.commentCount}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Section "Mes publications" affichée dans l'écran Profil du propriétaire du compte.
+function MyPostsSection({ currentUserId }) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(!!API_BASE);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [openPost, setOpenPost] = useState(null);
+  const inputRef = useRef(null);
+
+  const load = async () => {
+    if (!API_BASE) { setLoading(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/posts/mine`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+      const data = await res.json();
+      setPosts(data.posts || []);
+    } catch {
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setUploading(true);
+    try {
+      const { url, mediaType } = await uploadMediaToCloudinary(file);
+      if (API_BASE) {
+        const res = await fetch(`${API_BASE}/api/posts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: JSON.stringify({ mediaUrl: url, mediaType }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Échec de la publication.");
+        setPosts((p) => [data.post, ...p]);
+      } else {
+        setPosts((p) => [{ id: Date.now(), media_url: url, media_type: mediaType, likeCount: 0, commentCount: 0, comments_enabled: 1, comments_permission: "everyone" }, ...p]);
+      }
+    } catch (err) {
+      setError(err.message || "Échec de l'envoi.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes publications</label>
+        <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{
+          display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+          borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
+        }}>
+          <Plus size={13} /> {uploading ? "Envoi..." : "Publier"}
+        </button>
+        <input ref={inputRef} type="file" accept="image/*,video/*" onChange={handleFile} style={{ display: "none" }} />
+      </div>
+      {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{error}</p>}
+      <div style={{ marginTop: 10 }}>
+        {loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
+        {!loading && posts.length === 0 && (
+          <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucune publication pour l'instant. Partage une photo ou une vidéo !</p>
+        )}
+        <PostsGrid posts={posts} isOwner currentUserId={currentUserId} onOpen={setOpenPost} />
+      </div>
+      {openPost && (
+        <PostDetailModal
+          post={openPost} isOwner currentUserId={currentUserId}
+          onClose={() => setOpenPost(null)}
+          onDeleted={(id) => setPosts((p) => p.filter((x) => x.id !== id))}
+          onUpdated={(id, patch) => setPosts((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)))}
+        />
+      )}
+    </div>
+  );
+}
+
+// Section publications affichée sur la fiche profil d'un match (lecture + like + commentaire, pas de réglages).
+function UserPostsSection({ userId, currentUserId }) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(!!API_BASE);
+  const [openPost, setOpenPost] = useState(null);
+
+  useEffect(() => {
+    if (!API_BASE || !userId) { setLoading(false); return; }
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/users/${userId}/posts`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+        const data = await res.json();
+        setPosts(data.posts || []);
+      } catch {
+        setPosts([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [userId]);
+
+  if (loading) return null;
+  if (posts.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Publications</p>
+      <PostsGrid posts={posts} isOwner={false} currentUserId={currentUserId} onOpen={setOpenPost} />
+      {openPost && (
+        <PostDetailModal
+          post={openPost} isOwner={false} currentUserId={currentUserId}
+          onClose={() => setOpenPost(null)}
+          onUpdated={(id, patch) => setPosts((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)))}
+        />
+      )}
     </div>
   );
 }
@@ -1493,6 +1873,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           <PhotoUploader photos={photos} onChange={setPhotos} />
         </div>
       </div>
+
+      <MyPostsSection currentUserId={user?.id} />
 
       <div style={{ marginTop: 20 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Bio</label>
@@ -2303,7 +2685,7 @@ function MainApp() {
       ) : !user ? (
         <AuthScreen onAuth={setUser} />
       ) : viewingProfile ? (
-        <ProfileDetailScreen match={viewingProfile} onBack={() => setViewingProfile(null)} onMessage={() => openChat(viewingProfile)} />
+        <ProfileDetailScreen match={viewingProfile} currentUserId={user?.id} onBack={() => setViewingProfile(null)} onMessage={() => openChat(viewingProfile)} />
       ) : activeChat ? (
         <ChatScreen conversation={activeChat} currentUserId={user?.id} onBack={() => setActiveChat(null)} onSend={sendMessage} onViewProfile={openProfile} />
       ) : (
