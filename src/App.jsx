@@ -912,6 +912,9 @@ function MatchesScreen({ matches, onOpenChat, onViewProfile }) {
               <div style={{
                 position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(27,18,35,0.85), transparent 60%)",
               }} />
+              {m.last_active_at && getPresence(m.last_active_at).online && (
+                <span style={{ position: "absolute", top: 10, right: 10, width: 11, height: 11, borderRadius: "50%", background: "#3ECF6B", border: "2px solid #1B1223" }} />
+              )}
               <span style={{
                 position: "absolute", bottom: 10, left: 12, color: "#FBEFE9",
                 fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600,
@@ -937,6 +940,27 @@ function formatMessageTime(iso) {
   return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: sameYear ? undefined : "2-digit" });
 }
 
+// Statut de présence "En ligne" / "Vu il y a..." à partir de la dernière activité connue (last_active_at).
+function getPresence(iso) {
+  if (!iso) return { online: false, label: "" };
+  const date = new Date(iso + "Z");
+  const now = new Date();
+  const diffMin = (now - date) / 60000;
+  if (diffMin < 2) return { online: true, label: "En ligne" };
+  if (diffMin < 60) return { online: false, label: `Vu il y a ${Math.max(1, Math.floor(diffMin))} min` };
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) return { online: false, label: `Vu il y a ${Math.floor(diffMin / 60)} h` };
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return { online: false, label: `Vu hier à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` };
+  }
+  if (diffMin < 7 * 24 * 60) {
+    return { online: false, label: `Vu ${date.toLocaleDateString("fr-FR", { weekday: "long" })}` };
+  }
+  return { online: false, label: `Vu le ${date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}` };
+}
+
 function MessagesScreen({ conversations, onOpenChat }) {
   const [remoteList, setRemoteList] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE);
@@ -949,7 +973,7 @@ function MessagesScreen({ conversations, onOpenChat }) {
         const res = await fetch(`${API_BASE}/api/matches`, { headers: { Authorization: `Bearer ${token}` } });
         const data = await res.json();
         setRemoteList((data.matches || []).map((m) => ({
-          id: m.id, matchId: m.match_id, name: m.name, img: m.img,
+          id: m.id, matchId: m.match_id, name: m.name, img: m.img, last_active_at: m.last_active_at,
           lastMsg: m.last_message || "Dites bonjour !",
           time: formatMessageTime(m.last_message_at),
           unread: (m.unread_count || 0) > 0,
@@ -979,7 +1003,12 @@ function MessagesScreen({ conversations, onOpenChat }) {
             display: "flex", alignItems: "center", gap: 12, padding: "12px 4px",
             borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
           }}>
-            <img src={c.img} alt={c.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <img src={c.img} alt={c.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />
+              {c.last_active_at && getPresence(c.last_active_at).online && (
+                <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: "#3ECF6B", border: "2px solid #1B1223" }} />
+              )}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#FBEFE9", fontWeight: 600, fontSize: 15 }}>{c.name}</span>
@@ -1063,6 +1092,16 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
           {(p.city || p.profession) && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
               <MapPin size={13} /> {p.city}{p.profession ? ` · ${p.profession}` : ""}
+            </div>
+          )}
+          {p.last_active_at && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
+              {getPresence(p.last_active_at).online && (
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3ECF6B" }} />
+              )}
+              <span style={{ color: getPresence(p.last_active_at).online ? "#3ECF6B" : "#B39FBF", fontSize: 12.5, fontWeight: 600 }}>
+                {getPresence(p.last_active_at).label}
+              </span>
             </div>
           )}
         </div>
@@ -1206,8 +1245,20 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
           onClick={() => onViewProfile?.(conversation)}
           style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
         >
-          <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-          <span style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600 }}>{conversation.name}</span>
+          <div style={{ position: "relative" }}>
+            <img src={conversation.img} alt={conversation.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+            {getPresence(conversation.last_active_at).online && (
+              <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: "#3ECF6B", border: "2px solid #1B1223" }} />
+            )}
+          </div>
+          <div>
+            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, margin: 0 }}>{conversation.name}</p>
+            {conversation.last_active_at && (
+              <p style={{ color: getPresence(conversation.last_active_at).online ? "#3ECF6B" : "#8C7A94", fontSize: 11, margin: 0 }}>
+                {getPresence(conversation.last_active_at).label}
+              </p>
+            )}
+          </div>
         </button>
         <ReportBlockMenu targetId={conversation.id} targetName={conversation.name} iconColor="#8C7A94" onBlocked={onBack} />
       </div>
