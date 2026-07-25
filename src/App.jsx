@@ -1162,21 +1162,33 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
 
   const isMine = (m) => (API_BASE ? m.sender_id === currentUserId : m.from === "me");
 
+  const [sendError, setSendError] = useState("");
+
   const send = async () => {
     const value = text.trim();
     if (!value) return;
     setText("");
+    setSendError("");
     if (API_BASE && conversation.matchId) {
-      setMessages((m) => [...m, { sender_id: currentUserId, text: value, created_at: new Date().toISOString() }]);
+      const tempId = `temp-${Date.now()}`;
+      setMessages((m) => [...m, { tempId, sender_id: currentUserId, text: value, created_at: new Date().toISOString() }]);
       try {
         const token = localStorage.getItem("token");
-        await fetch(`${API_BASE}/api/matches/${conversation.matchId}/messages`, {
+        const res = await fetch(`${API_BASE}/api/matches/${conversation.matchId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ text: value }),
         });
+        const data = await res.json();
+        if (!res.ok) {
+          // Message refusé par le serveur (ex: coordonnées personnelles bloquées) : on le retire de l'affichage
+          // et on redonne le texte à l'utilisateur pour qu'il puisse le modifier.
+          setMessages((m) => m.filter((x) => x.tempId !== tempId));
+          setSendError(data.error || "Message non envoyé.");
+          setText(value);
+        }
       } catch {
-        // Le message reste affiché localement même en cas de coupure réseau ponctuelle.
+        // Coupure réseau ponctuelle : on laisse le message affiché localement.
       }
     } else {
       onSend(value);
@@ -1224,6 +1236,11 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
           );
         })}
       </div>
+      {sendError && (
+        <div style={{ margin: "0 16px 8px", padding: "10px 12px", background: "rgba(255,107,91,0.12)", border: "1px solid rgba(255,107,91,0.35)", borderRadius: 12 }}>
+          <p style={{ color: "#FF9B8E", fontSize: 12, margin: 0, lineHeight: 1.4 }}>🔒 {sendError}</p>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <input
           value={text}
