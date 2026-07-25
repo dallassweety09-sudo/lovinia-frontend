@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -1312,6 +1312,97 @@ function VisitorsModal({ onClose }) {
   );
 }
 
+function GiftPickerModal({ postId, onClose, onSent }) {
+  const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+  const [gifts, setGifts] = useState([]);
+  const [loading, setLoading] = useState(!!API_BASE);
+  const [sendingId, setSendingId] = useState(null);
+  const [error, setError] = useState("");
+  const [coins, setCoins] = useState(null);
+
+  useEffect(() => {
+    if (!API_BASE) {
+      setGifts([{ id: 1, name: "Rose", icon: "🌹", price_coins: 20 }, { id: 2, name: "Cœur", icon: "❤️", price_coins: 50 }, { id: 3, name: "Diamant", icon: "💎", price_coins: 150 }, { id: 4, name: "Couronne", icon: "👑", price_coins: 300 }]);
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const [gRes, cRes] = await Promise.all([
+          fetch(`${API_BASE}/api/gifts/catalog`, { headers: authHeaders() }),
+          fetch(`${API_BASE}/api/me/coins`, { headers: authHeaders() }),
+        ]);
+        const gData = await gRes.json();
+        const cData = await cRes.json();
+        setGifts(gData.gifts || []);
+        setCoins(typeof cData.coins === "number" ? cData.coins : null);
+      } catch {
+        setGifts([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const sendGift = async (gift) => {
+    setError("");
+    setSendingId(gift.id);
+    if (!API_BASE) {
+      onSent(gift);
+      onClose();
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/posts/${postId}/gifts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ giftId: gift.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Impossible d'envoyer ce cadeau.");
+      onSent(gift);
+      onClose();
+    } catch (e) {
+      setError(e.message || "Erreur d'envoi.");
+      setSendingId(null);
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 320, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 20px 30px", width: "100%", maxWidth: 420 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Envoyer un cadeau</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+        {coins != null && (
+          <p style={{ color: "#B39FBF", fontSize: 12, marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
+            <Coins size={13} color="#F2B84B" /> Solde : {coins} Coins
+          </p>
+        )}
+        {loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
+        {error && <p style={{ color: "#FF6B5B", fontSize: 12, marginBottom: 10 }}>{error}</p>}
+        {!loading && gifts.length === 0 && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucun cadeau disponible pour l'instant.</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 6 }}>
+          {gifts.map((g) => (
+            <button key={g.id} onClick={() => sendGift(g)} disabled={sendingId === g.id} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "12px 4px",
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14,
+              cursor: sendingId === g.id ? "default" : "pointer", opacity: sendingId === g.id ? 0.6 : 1,
+            }}>
+              <span style={{ fontSize: 28 }}>{g.icon}</span>
+              <span style={{ color: "#FBEFE9", fontSize: 11 }}>{g.name}</span>
+              <span style={{ color: "#F2B84B", fontSize: 10.5, display: "flex", alignItems: "center", gap: 2 }}>
+                <Coins size={10} /> {g.price_coins}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onUpdated }) {
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
   const [liked, setLiked] = useState(post.likedByMe);
@@ -1323,6 +1414,28 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
   const [showSettings, setShowSettings] = useState(false);
   const [commentsEnabled, setCommentsEnabled] = useState(post.comments_enabled !== 0);
   const [commentsPermission, setCommentsPermission] = useState(post.comments_permission || "everyone");
+  const [giftTotal, setGiftTotal] = useState(0);
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const [giftBurst, setGiftBurst] = useState(null); // icône affichée brièvement à l'envoi
+
+  useEffect(() => {
+    if (!API_BASE) return;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/posts/${post.id}/gifts`, { headers: authHeaders() });
+        const data = await res.json();
+        setGiftTotal(data.total || 0);
+      } catch {
+        setGiftTotal(0);
+      }
+    })();
+  }, [post.id]);
+
+  const handleGiftSent = (gift) => {
+    setGiftTotal((c) => c + 1);
+    setGiftBurst(gift.icon);
+    setTimeout(() => setGiftBurst(null), 1600);
+  };
 
   useEffect(() => {
     if (!API_BASE) { setLoadingComments(false); return; }
@@ -1431,6 +1544,12 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
           ) : (
             <img src={post.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           )}
+          {giftBurst && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <span style={{ fontSize: 64, animation: "giftFloat 1.6s ease-out forwards" }}>{giftBurst}</span>
+              <style>{`@keyframes giftFloat { 0% { transform: translateY(20px) scale(0.5); opacity: 0; } 30% { transform: translateY(-10px) scale(1.2); opacity: 1; } 100% { transform: translateY(-90px) scale(1); opacity: 0; } }`}</style>
+            </div>
+          )}
           <button onClick={onClose} style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.55)", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <X size={16} color="#FBEFE9" />
           </button>
@@ -1477,6 +1596,19 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
           <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#B39FBF", fontSize: 13 }}>
             <MessageCircle size={18} /> {comments.length}
           </span>
+          {giftTotal > 0 && (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#B39FBF", fontSize: 13 }}>
+              <Gift size={17} /> {giftTotal}
+            </span>
+          )}
+          {!isOwner && post.owner_verified && (
+            <button onClick={() => setShowGiftPicker(true)} style={{
+              marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, background: "rgba(242,184,75,0.15)",
+              border: "1px solid rgba(242,184,75,0.4)", borderRadius: 999, padding: "6px 12px", color: "#F2B84B", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+            }}>
+              <Gift size={14} /> Cadeau
+            </button>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "10px 16px" }}>
@@ -1516,6 +1648,9 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
           )}
         </div>
       </div>
+      {showGiftPicker && (
+        <GiftPickerModal postId={post.id} onClose={() => setShowGiftPicker(false)} onSent={handleGiftSent} />
+      )}
     </div>
   );
 }
@@ -2485,12 +2620,137 @@ const fieldInput = {
   background: "none", border: "none", outline: "none", color: "#FBEFE9", fontSize: 14, flex: 1,
 };
 
+function GiftsAdminSection({ adminKey }) {
+  const [gifts, setGifts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [newGift, setNewGift] = useState({ name: "", icon: "", priceCoins: "" });
+  const [creating, setCreating] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/gifts`, { headers: { "x-admin-key": adminKey } });
+      const data = await res.json();
+      setGifts(data.gifts || []);
+    } catch {
+      setError("Impossible de charger la boutique.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const updateGift = async (id, patch) => {
+    setGifts((g) => g.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    try {
+      await fetch(`${API_BASE}/api/admin/gifts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({
+          name: patch.name, icon: patch.icon,
+          priceCoins: patch.price_coins != null ? Number(patch.price_coins) : undefined,
+          active: patch.active != null ? !!patch.active : undefined,
+        }),
+      });
+    } catch {
+      setError("Une modification n'a pas pu être enregistrée. Réessaie.");
+    }
+  };
+
+  const createGift = async () => {
+    if (!newGift.name || !newGift.icon || !newGift.priceCoins) return;
+    setCreating(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/gifts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ name: newGift.name, icon: newGift.icon, priceCoins: Number(newGift.priceCoins) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Création impossible.");
+      setGifts((g) => [...g, data.gift]);
+      setNewGift({ name: "", icon: "", priceCoins: "" });
+    } catch (e) {
+      setError(e.message || "Erreur de création.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 6 }}>Boutique de cadeaux</p>
+      <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 20 }}>Le destinataire d'un cadeau reçoit 50% de sa valeur en Coins.</p>
+      {error && <p style={{ color: "#FF6B5B", fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
+      {loading && <p style={{ color: "#B39FBF" }}>Chargement...</p>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 14, marginBottom: 24 }}>
+        {gifts.map((g) => (
+          <div key={g.id} style={{ background: "#2A1B33", borderRadius: 14, padding: 16, opacity: g.active ? 1 : 0.5 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <input
+                value={g.icon} onChange={(e) => updateGift(g.id, { icon: e.target.value })}
+                style={{ width: 44, textAlign: "center", fontSize: 20, padding: "6px 0", borderRadius: 8, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9" }}
+              />
+              <input
+                value={g.name} onChange={(e) => updateGift(g.id, { name: e.target.value })}
+                style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9", fontSize: 13.5 }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <Coins size={14} color="#F2B84B" />
+              <input
+                type="number" value={g.price_coins}
+                onChange={(e) => updateGift(g.id, { price_coins: e.target.value })}
+                style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9", fontSize: 13 }}
+              />
+              <span style={{ color: "#8C7A94", fontSize: 12 }}>Coins</span>
+            </div>
+            <button onClick={() => updateGift(g.id, { active: g.active ? 0 : 1 })} style={{
+              width: "100%", padding: "7px 0", borderRadius: 8, cursor: "pointer", fontSize: 12,
+              background: g.active ? "rgba(255,107,91,0.15)" : "rgba(79,168,255,0.15)",
+              color: g.active ? "#FF6B5B" : "#4FA8FF",
+              border: `1px solid ${g.active ? "rgba(255,107,91,0.35)" : "rgba(79,168,255,0.4)"}`,
+            }}>{g.active ? "Désactiver" : "Réactiver"}</button>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#2A1B33", borderRadius: 14, padding: 16, maxWidth: 420 }}>
+        <p style={{ color: "#FBEFE9", fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Ajouter un nouveau cadeau</p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <input
+            placeholder="🎁" value={newGift.icon} onChange={(e) => setNewGift((n) => ({ ...n, icon: e.target.value }))}
+            style={{ width: 50, textAlign: "center", padding: "8px 0", borderRadius: 8, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9" }}
+          />
+          <input
+            placeholder="Nom du cadeau" value={newGift.name} onChange={(e) => setNewGift((n) => ({ ...n, name: e.target.value }))}
+            style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9", fontSize: 13.5 }}
+          />
+          <input
+            type="number" placeholder="Prix" value={newGift.priceCoins} onChange={(e) => setNewGift((n) => ({ ...n, priceCoins: e.target.value }))}
+            style={{ width: 80, padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9", fontSize: 13.5 }}
+          />
+        </div>
+        <button onClick={createGift} disabled={creating} style={{
+          width: "100%", padding: "10px 0", borderRadius: 10, cursor: creating ? "default" : "pointer",
+          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontWeight: 600, fontSize: 13, opacity: creating ? 0.7 : 1,
+        }}>{creating ? "Création..." : "Ajouter à la boutique"}</button>
+      </div>
+    </div>
+  );
+}
+
 function AdminScreen() {
   const [adminKey, setAdminKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("verifications");
 
   const load = async (key) => {
     setLoading(true);
@@ -2560,6 +2820,23 @@ function AdminScreen() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#1B1223", padding: 24, fontFamily: "Inter, sans-serif" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+        <button onClick={() => setTab("verifications")} style={{
+          padding: "8px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13.5,
+          background: tab === "verifications" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+          color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+        }}>Vérifications</button>
+        <button onClick={() => setTab("gifts")} style={{
+          padding: "8px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13.5,
+          background: tab === "gifts" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+          color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+        }}>Boutique de cadeaux</button>
+      </div>
+
+      {tab === "gifts" ? (
+        <GiftsAdminSection adminKey={adminKey} />
+      ) : (
+        <>
       <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 20 }}>
         Vérifications en attente ({pending.length})
       </p>
@@ -2591,6 +2868,8 @@ function AdminScreen() {
           </div>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }
