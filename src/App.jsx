@@ -186,7 +186,7 @@ function ReportBlockMenu({ targetId, targetName, onBlocked, iconColor = "#FBEFE9
           }}>
             {view === "menu" && (
               <>
-                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 14 }}>{targetName}</p>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, marginBottom: 14 }}>{targetName}</p>
                 <button onClick={() => setView("report")} style={menuBtnStyle}>
                   <Flag size={16} /> Signaler ce profil
                 </button>
@@ -199,7 +199,7 @@ function ReportBlockMenu({ targetId, targetName, onBlocked, iconColor = "#FBEFE9
 
             {view === "report" && (
               <>
-                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 4 }}>Signaler {targetName}</p>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, marginBottom: 4 }}>Signaler {targetName}</p>
                 <p style={{ color: "#B39FBF", fontSize: 12.5, marginBottom: 14 }}>Choisis le motif qui correspond le mieux :</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                   {REPORT_REASONS.map((r) => (
@@ -230,7 +230,7 @@ function ReportBlockMenu({ targetId, targetName, onBlocked, iconColor = "#FBEFE9
 
             {view === "block-confirm" && (
               <>
-                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 8 }}>Bloquer {targetName} ?</p>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, marginBottom: 8 }}>Bloquer {targetName} ?</p>
                 <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
                   Cette personne ne pourra plus voir ton profil ni te contacter. Votre match et vos messages seront supprimés.
                 </p>
@@ -246,7 +246,7 @@ function ReportBlockMenu({ targetId, targetName, onBlocked, iconColor = "#FBEFE9
 
             {view === "done" && (
               <>
-                <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, marginBottom: 8 }}>Signalement envoyé</p>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, marginBottom: 8 }}>Signalement envoyé</p>
                 <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 16 }}>Merci, notre équipe va l'examiner.</p>
                 <button onClick={close} style={{
                   width: "100%", padding: "11px 0", borderRadius: 12, cursor: "pointer",
@@ -364,8 +364,8 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
       )}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "20px 22px" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ fontFamily: "Fraunces, serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
-          <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
+          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
+          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
           {profile.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
@@ -384,12 +384,12 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
 
       <div style={{
         position: "absolute", top: 28, left: 24, padding: "6px 14px", borderRadius: 10,
-        border: "3px solid #6BE0A8", color: "#6BE0A8", fontFamily: "Fraunces, serif", fontWeight: 700,
+        border: "3px solid #6BE0A8", color: "#6BE0A8", fontFamily: "Manrope, sans-serif", fontWeight: 700,
         fontSize: 22, letterSpacing: 1, transform: "rotate(-18deg)", opacity: likeOpacity,
       }}>LIKE</div>
       <div style={{
         position: "absolute", top: 28, right: 24, padding: "6px 14px", borderRadius: 10,
-        border: "3px solid #FF6B5B", color: "#FF6B5B", fontFamily: "Fraunces, serif", fontWeight: 700,
+        border: "3px solid #FF6B5B", color: "#FF6B5B", fontFamily: "Manrope, sans-serif", fontWeight: 700,
         fontSize: 22, letterSpacing: 1, transform: "rotate(18deg)", opacity: passOpacity,
       }}>PASS</div>
     </div>
@@ -410,7 +410,7 @@ function FiltersPanel({ filters, onApply, onClose }) {
       padding: "20px 20px 0", display: "flex", flexDirection: "column", overflowY: "auto",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#FBEFE9", fontWeight: 600 }}>Filtres</span>
+        <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#FBEFE9", fontWeight: 600 }}>Filtres</span>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#FBEFE9", cursor: "pointer" }}>
           <X size={22} />
         </button>
@@ -744,7 +744,7 @@ function DiscoverScreen({ onNewMatch }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <img src="/logo.png" alt="Lovinia" style={{ width: 24, height: 24, borderRadius: 6 }} />
-          <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 700, color: "#FBEFE9" }}>Lovinia</span>
+          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, fontWeight: 700, color: "#FBEFE9" }}>Lovinia</span>
         </div>
         <button onClick={() => setShowFilters(true)} style={{
           background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
@@ -785,7 +785,7 @@ function DiscoverScreen({ onNewMatch }) {
             alignItems: "center", justifyContent: "center", color: "#D8C4D0", textAlign: "center", gap: 8,
           }}>
             <Heart size={36} color="#FF6B5B" />
-            <p style={{ fontFamily: "Fraunces, serif", fontSize: 19, color: "#FBEFE9" }}>Plus personne à découvrir</p>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 19, color: "#FBEFE9" }}>Plus personne à découvrir</p>
             <p style={{ fontSize: 13, maxWidth: 220 }}>
               {API_BASE ? "Invite d'autres personnes à s'inscrire pour voir plus de profils." : "Reviens plus tard pour voir de nouveaux profils près de toi."}
             </p>
@@ -833,7 +833,7 @@ function DiscoverScreen({ onNewMatch }) {
           }}><X size={20} /></button>
 
           <Crown size={40} color="#F2B84B" />
-          <p style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#FBEFE9", fontWeight: 700, marginTop: 12 }}>
+          <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#FBEFE9", fontWeight: 700, marginTop: 12 }}>
             Limite quotidienne atteinte
           </p>
           <p style={{ color: "#D8C4D0", fontSize: 13.5, marginTop: 8, maxWidth: 260 }}>
@@ -907,7 +907,7 @@ function MatchesScreen({ matches, onOpenChat, onViewProfile }) {
 
   return (
     <div style={{ padding: "18px 18px 0" }}>
-      <span style={{ fontFamily: "Fraunces, serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mes matchs</span>
+      <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mes matchs</span>
       {loading ? (
         <p style={{ color: "#B39FBF", fontSize: 14, marginTop: 40, textAlign: "center" }}>Chargement...</p>
       ) : list.length === 0 ? (
@@ -929,7 +929,7 @@ function MatchesScreen({ matches, onOpenChat, onViewProfile }) {
               )}
               <span style={{
                 position: "absolute", bottom: 10, left: 12, color: "#FBEFE9",
-                fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600,
+                fontFamily: "Manrope, sans-serif", fontSize: 16, fontWeight: 600,
               }}>{m.name}</span>
             </div>
           ))}
@@ -1002,7 +1002,7 @@ function MessagesScreen({ conversations, onOpenChat }) {
 
   return (
     <div style={{ padding: "18px 18px 0" }}>
-      <span style={{ fontFamily: "Fraunces, serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Messages</span>
+      <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Messages</span>
       <div style={{ marginTop: 12 }}>
         {loading && <p style={{ color: "#B39FBF", fontSize: 14, marginTop: 20, textAlign: "center" }}>Chargement...</p>}
         {!loading && list.length === 0 && (
@@ -1097,8 +1097,8 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
         </div>
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "20px 22px" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontFamily: "Fraunces, serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{p.name}</span>
-            {p.age ? <span style={{ fontFamily: "Fraunces, serif", fontSize: 22, color: "#E7D4E0" }}>{p.age}</span> : null}
+            <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{p.name}</span>
+            {p.age ? <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#E7D4E0" }}>{p.age}</span> : null}
             {p.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
           </div>
           {(p.city || p.profession) && (
@@ -1264,7 +1264,7 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
             )}
           </div>
           <div>
-            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, margin: 0 }}>{conversation.name}</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, margin: 0 }}>{conversation.name}</p>
             {conversation.last_active_at && (
               <p style={{ color: getPresence(conversation.last_active_at).online ? "#3ECF6B" : "#8C7A94", fontSize: 11, margin: 0 }}>
                 {getPresence(conversation.last_active_at).label}
@@ -1352,7 +1352,7 @@ function VisitorsModal({ onClose }) {
         background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "75vh", overflowY: "auto",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Qui a visité mon profil</p>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Qui a visité mon profil</p>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
         </div>
 
@@ -1442,7 +1442,7 @@ function GiftPickerModal({ postId, onClose, onSent }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 320, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 20px 30px", width: "100%", maxWidth: 420 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Envoyer un cadeau</p>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Envoyer un cadeau</p>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
         </div>
         {coins != null && (
@@ -1793,7 +1793,7 @@ function PostViewersModal({ postId, onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 330, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 20, width: "100%", maxWidth: 400, maxHeight: "75vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
             <Eye size={18} /> Qui a vu ({viewers.length})
           </p>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
@@ -2058,7 +2058,7 @@ function WalletModal({ onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 18, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
             <Wallet size={18} color="#F2B84B" /> Mon portefeuille
           </p>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
@@ -2066,7 +2066,7 @@ function WalletModal({ onClose }) {
 
         <div style={{ padding: "20px 18px", textAlign: "center", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <p style={{ color: "#8C7A94", fontSize: 12, marginBottom: 6 }}>Solde actuel</p>
-          <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 34, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, margin: 0 }}>
+          <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 34, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, margin: 0 }}>
             <Coins size={26} /> {loading ? "..." : coins ?? 0}
           </p>
         </div>
@@ -2296,7 +2296,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 
   return (
     <div style={{ padding: "18px 18px 0" }}>
-      <span style={{ fontFamily: "Fraunces, serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mon profil</span>
+      <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mon profil</span>
 
       {!emailVerified && (
         <div style={{ marginTop: 14, padding: 14, borderRadius: 14, background: "rgba(242,184,75,0.12)", border: "1px solid rgba(242,184,75,0.35)" }}>
@@ -2328,7 +2328,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         </div>
         <input value={name} onChange={(e) => setName(e.target.value)} style={{
           background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)",
-          color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, textAlign: "center",
+          color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, textAlign: "center",
           marginTop: 14, padding: "4px 0", outline: "none", width: 200,
         }} />
         {verificationStatus === "verified" && (
@@ -2849,7 +2849,7 @@ function LegalModal({ type, onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 18, width: "100%", maxWidth: 480, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, margin: 0 }}>{title}</p>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, margin: 0 }}>{title}</p>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
         </div>
         <div style={{ padding: "16px 18px", overflowY: "auto" }}>
@@ -3004,9 +3004,9 @@ function AuthScreen({ onAuth }) {
       <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "48px 26px 30px", justifyContent: "center" }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <img src="/logo.png" alt="Lovinia" style={{ width: 64, height: 64, borderRadius: 16 }} />
-          <p style={{ fontFamily: "Fraunces, serif", fontSize: 32, color: "#FBEFE9", fontWeight: 700, margin: "10px 0 0" }}>Lovinia</p>
+          <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 32, color: "#FBEFE9", fontWeight: 700, margin: "10px 0 0" }}>Lovinia</p>
           <p style={{ color: "#E89BB0", fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", margin: "2px 0 10px" }}>Connectez les cœurs</p>
-          <p style={{ fontFamily: "Fraunces, serif", fontSize: 20, color: "#F2B84B", fontWeight: 600, margin: "2px 0 8px" }}>Bon retour</p>
+          <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 20, color: "#F2B84B", fontWeight: 600, margin: "2px 0 8px" }}>Bon retour</p>
           <p style={{ color: "#B39FBF", fontSize: 13 }}>Connecte-toi pour continuer</p>
         </div>
 
@@ -3025,8 +3025,8 @@ function AuthScreen({ onAuth }) {
         </div>
         {error && <p style={{ color: "#FF6B5B", fontSize: 12, margin: "8px 0 0" }}>{error}</p>}
         <button onClick={submit} disabled={loading} style={{
-          marginTop: 18, padding: "13px 0", borderRadius: 14, cursor: loading ? "default" : "pointer",
-          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
+          marginTop: 18, padding: "13px 0", borderRadius: 999, cursor: loading ? "default" : "pointer",
+          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)", color: "#2A0E12", border: "none", fontSize: 15, fontWeight: 800, fontFamily: "Manrope, sans-serif",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
         }}><LogIn size={16} />{loading ? "Connexion..." : "Se connecter"}</button>
         <p style={{ textAlign: "center", color: "#B39FBF", fontSize: 13, marginTop: 18 }}>
@@ -3043,7 +3043,7 @@ function AuthScreen({ onAuth }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "28px 24px 24px" }}>
       <div style={{ textAlign: "center", marginBottom: 18 }}>
         <img src="/logo.png" alt="Lovinia" style={{ width: 48, height: 48, borderRadius: 12 }} />
-        <p style={{ fontFamily: "Fraunces, serif", fontSize: 24, color: "#FBEFE9", fontWeight: 700, margin: "8px 0 0" }}>Lovinia</p>
+        <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, color: "#FBEFE9", fontWeight: 700, margin: "8px 0 0" }}>Lovinia</p>
         <p style={{ color: "#E89BB0", fontSize: 10.5, letterSpacing: 1.3, textTransform: "uppercase", margin: "2px 0 0" }}>Connectez les cœurs</p>
         {mode === "complete-google" && (
           <p style={{ color: "#F2B84B", fontSize: 12.5, marginTop: 10 }}>Encore quelques infos pour finaliser ton profil</p>
@@ -3059,7 +3059,7 @@ function AuthScreen({ onAuth }) {
       <div style={{ flex: 1, overflowY: "auto" }}>
         {stepName === "compte" && (
           <>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Créons ton compte</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Créons ton compte</p>
 
             <GoogleSignInButton onGoogleAuth={handleGoogleAuth} disabled={loading} />
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
@@ -3076,7 +3076,7 @@ function AuthScreen({ onAuth }) {
 
         {stepName === "details" && (
           <>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Parle-nous de toi</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Parle-nous de toi</p>
             <div style={{ marginBottom: 12 }}>
               <label style={{ color: "#B39FBF", fontSize: 12 }}>Date de naissance</label>
               <div style={{ ...fieldWrap, marginTop: 6 }}>
@@ -3120,7 +3120,7 @@ function AuthScreen({ onAuth }) {
 
         {stepName === "interets" && (
           <>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tes centres d'intérêt</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tes centres d'intérêt</p>
             <TagInput label="Centres d'intérêt" values={form.interests} onChange={(v) => set("interests", v)} placeholder="Ex: Musique, Voyage..." />
             <TagInput label="Langues parlées" values={form.langues} onChange={(v) => set("langues", v)} placeholder="Ex: Français, Anglais..." />
           </>
@@ -3128,7 +3128,7 @@ function AuthScreen({ onAuth }) {
 
         {stepName === "intention" && (
           <>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tu recherches...</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tu recherches...</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {INTENTIONS.map((it) => (
                 <button key={it.value} type="button" onClick={() => set("intention", it.value)} style={{
@@ -3143,14 +3143,14 @@ function AuthScreen({ onAuth }) {
 
         {stepName === "photos" && (
           <>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Ajoute tes photos</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Ajoute tes photos</p>
             <PhotoUploader photos={form.photos} onChange={(v) => set("photos", v)} />
           </>
         )}
 
         {stepName === "consentement" && (
           <>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Dernière étape</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Dernière étape</p>
             <p style={{ color: "#D8C4D0", fontSize: 13.5, lineHeight: 1.6, marginBottom: 18 }}>
               Avant de créer ton compte, merci de confirmer les points suivants.
             </p>
@@ -3187,8 +3187,8 @@ function AuthScreen({ onAuth }) {
           }}>Retour</button>
         )}
         <button onClick={goNext} disabled={loading} style={{
-          flex: 2, padding: "13px 0", borderRadius: 14, cursor: loading ? "default" : "pointer",
-          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
+          flex: 2, padding: "13px 0", borderRadius: 999, cursor: loading ? "default" : "pointer",
+          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)", color: "#2A0E12", border: "none", fontSize: 15, fontWeight: 800, fontFamily: "Manrope, sans-serif",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
         }}>
           <LogIn size={16} />
@@ -3279,20 +3279,20 @@ function GiftsAdminSection({ adminKey }) {
 
   return (
     <div>
-      <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 6 }}>Boutique de cadeaux</p>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 24, marginBottom: 6 }}>Boutique de cadeaux</p>
       <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 16 }}>Le destinataire d'un cadeau reçoit 70% de sa valeur en Coins ; 30% reviennent à la plateforme.</p>
 
       {revenue && (
         <div style={{ background: "rgba(242,184,75,0.1)", border: "1px solid rgba(242,184,75,0.3)", borderRadius: 14, padding: 16, marginBottom: 20, display: "flex", gap: 24 }}>
           <div>
             <p style={{ color: "#8C7A94", fontSize: 11, marginBottom: 4 }}>Revenu plateforme (commission 30%)</p>
-            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 22, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
               <Coins size={18} /> {revenue.totalCoins}
             </p>
           </div>
           <div>
             <p style={{ color: "#8C7A94", fontSize: 11, marginBottom: 4 }}>Cadeaux envoyés au total</p>
-            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, margin: 0 }}>{revenue.giftsSentCount}</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 22, fontWeight: 600, margin: 0 }}>{revenue.giftsSentCount}</p>
           </div>
         </div>
       )}
@@ -3391,7 +3391,7 @@ function ModerationAdminSection({ adminKey }) {
 
   return (
     <div>
-      <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 6 }}>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 24, marginBottom: 6 }}>
         Publications en attente ({posts.length})
       </p>
       <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 20 }}>
@@ -3480,7 +3480,7 @@ function AdminScreen() {
         justifyContent: "center", fontFamily: "Inter, sans-serif",
       }}>
         <div style={{ background: "#2A1B33", padding: 32, borderRadius: 16, width: 320 }}>
-          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, marginBottom: 16 }}>Accès administrateur</p>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, marginBottom: 16 }}>Accès administrateur</p>
           <input
             type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)}
             placeholder="Clé admin"
@@ -3528,7 +3528,7 @@ function AdminScreen() {
         <ModerationAdminSection adminKey={adminKey} />
       ) : (
         <>
-      <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 20 }}>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 24, marginBottom: 20 }}>
         Vérifications en attente ({pending.length})
       </p>
       {pending.length === 0 && <p style={{ color: "#B39FBF" }}>Aucune demande en attente pour le moment.</p>}
@@ -3655,7 +3655,7 @@ function MainApp() {
       border: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column",
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
         @keyframes sparkPop {
           0% { transform: scale(0.4); opacity: 0; }
           40% { transform: scale(1.15); opacity: 1; }
@@ -3717,7 +3717,7 @@ function MainApp() {
           flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 50, gap: 10,
         }}>
           <Heart size={54} color="#FF6B5B" fill="#FF6B5B" />
-          <span style={{ fontFamily: "Fraunces, serif", fontSize: 26, color: "#FBEFE9", fontWeight: 700 }}>C'est un match !</span>
+          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 26, color: "#FBEFE9", fontWeight: 700 }}>C'est un match !</span>
           <span style={{ color: "#D8C4D0", fontSize: 14 }}>Toi et {matchToast.name}, vous vous êtes likés</span>
         </div>
       )}
@@ -3756,7 +3756,7 @@ function VerifyEmailScreen() {
         {status === "success" && (
           <>
             <p style={{ fontSize: 40, marginBottom: 12 }}>✅</p>
-            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Email confirmé !</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Email confirmé !</p>
             <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>Ton compte Lovinia est maintenant pleinement activé.</p>
             <a href="/" style={{ display: "inline-block", background: "#FF6B5B", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>
               Retourner sur Lovinia
@@ -3766,7 +3766,7 @@ function VerifyEmailScreen() {
         {status === "error" && (
           <>
             <p style={{ fontSize: 40, marginBottom: 12 }}>⚠️</p>
-            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Lien invalide</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Lien invalide</p>
             <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>{message} Tu peux redemander un email de confirmation depuis ton profil.</p>
             <a href="/" style={{ display: "inline-block", background: "rgba(255,255,255,0.08)", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14 }}>
               Retourner sur Lovinia
