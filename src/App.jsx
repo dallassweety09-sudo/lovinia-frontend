@@ -1636,7 +1636,7 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
       }}>
         <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", background: "#000", flexShrink: 0 }}>
           {post.media_type === "video" ? (
-            <video src={post.media_url} controls style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            <video src={post.media_url} controls playsInline preload="metadata" poster={getVideoThumbnail(post.media_url)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           ) : (
             <img src={post.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           )}
@@ -1822,6 +1822,14 @@ function PostViewersModal({ postId, onClose }) {
   );
 }
 
+// Cloudinary génère automatiquement une image fixe (frame) d'une vidéo si on change son extension en .jpg.
+// Beaucoup plus fiable qu'un <video> pour afficher une vignette (Safari iOS n'affiche pas toujours
+// la première image d'une balise <video> sans interaction de l'utilisateur).
+function getVideoThumbnail(videoUrl) {
+  if (!videoUrl) return videoUrl;
+  return videoUrl.replace(/\.[a-zA-Z0-9]+(\?.*)?$/, ".jpg$1");
+}
+
 function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
   if (posts.length === 0) return null;
   return (
@@ -1829,7 +1837,7 @@ function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
       {posts.map((p) => (
         <div key={p.id} onClick={() => onOpen(p)} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: "#2A1B33" }}>
           {p.media_type === "video" ? (
-            <video src={p.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+            <img src={getVideoThumbnail(p.media_url)} alt="Publication vidéo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <img src={p.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           )}
@@ -3370,7 +3378,7 @@ function ModerationAdminSection({ adminKey }) {
           <div key={p.id} style={{ background: "#2A1B33", borderRadius: 14, padding: 12 }}>
             <div style={{ width: "100%", aspectRatio: "1/1", borderRadius: 10, overflow: "hidden", marginBottom: 10, background: "#000" }}>
               {p.media_type === "video" ? (
-                <video src={p.media_url} controls style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <video src={p.media_url} controls playsInline preload="metadata" poster={getVideoThumbnail(p.media_url)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <img src={p.media_url} alt="À modérer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               )}
