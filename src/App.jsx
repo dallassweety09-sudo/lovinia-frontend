@@ -1495,6 +1495,23 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
   const [giftTotal, setGiftTotal] = useState(0);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [giftBurst, setGiftBurst] = useState(null); // icône affichée brièvement à l'envoi
+  const [viewCount, setViewCount] = useState(post.viewCount || 0);
+  const [showViewers, setShowViewers] = useState(false);
+
+  useEffect(() => {
+    if (!API_BASE) return;
+    // Enregistre une vue une seule fois par personne (le propriétaire ne compte pas ses propres vues).
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/posts/${post.id}/view`, { method: "POST", headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.viewCount === "number") setViewCount(data.viewCount);
+      } catch {
+        // Silencieux : le compteur de vues n'est pas critique.
+      }
+    })();
+  }, [post.id]);
 
   useEffect(() => {
     if (!API_BASE) return;
@@ -1675,6 +1692,17 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
           <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#B39FBF", fontSize: 13 }}>
             <MessageCircle size={18} /> {comments.length}
           </span>
+          {isOwner ? (
+            <button onClick={() => setShowViewers(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, color: "#B39FBF", fontSize: 13 }}>
+              <Eye size={17} /> {viewCount}
+            </button>
+          ) : (
+            viewCount > 0 && (
+              <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#B39FBF", fontSize: 13 }}>
+                <Eye size={17} /> {viewCount}
+              </span>
+            )
+          )}
           {giftTotal > 0 && (
             <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#B39FBF", fontSize: 13 }}>
               <Gift size={17} /> {giftTotal}
@@ -1730,6 +1758,66 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
       {showGiftPicker && (
         <GiftPickerModal postId={post.id} onClose={() => setShowGiftPicker(false)} onSent={handleGiftSent} />
       )}
+      {showViewers && (
+        <PostViewersModal postId={post.id} onClose={() => setShowViewers(false)} />
+      )}
+    </div>
+  );
+}
+
+function PostViewersModal({ postId, onClose }) {
+  const [viewers, setViewers] = useState([]);
+  const [loading, setLoading] = useState(!!API_BASE);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    if (!API_BASE) { setLoading(false); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/posts/${postId}/views`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setViewers(data.viewers || []);
+    } catch {
+      setError("Impossible de charger la liste pour le moment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 330, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 20, width: "100%", maxWidth: 400, maxHeight: "75vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Eye size={18} /> Qui a vu ({viewers.length})
+          </p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 18px" }}>
+          {error && (
+            <div>
+              <p style={{ color: "#FF6B5B", fontSize: 12, marginBottom: 8 }}>{error}</p>
+              <button onClick={load} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9", borderRadius: 10, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>Réessayer</button>
+            </div>
+          )}
+          {!error && loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
+          {!error && !loading && viewers.length === 0 && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Personne n'a encore vu cette publication.</p>}
+          {viewers.map((v) => (
+            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <img src={v.img} alt={v.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", background: "#3A2645" }} />
+              <div style={{ flex: 1 }}>
+                <p style={{ color: "#FBEFE9", fontSize: 13, margin: 0 }}>{v.name}</p>
+              </div>
+              <span style={{ color: "#6B5A73", fontSize: 11 }}>{formatMessageTime(v.viewed_at)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1831,7 +1919,7 @@ function MyPostsSection({ currentUserId }) {
           display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
           borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
         }}>
-          <Plus size={13} /> {uploading ? "Envoi..." : "Publier"}
+          <Plus size={13} /> {uploading ? "Envoi..." : "Photo ou vidéo"}
         </button>
         <input ref={inputRef} type="file" accept="image/*,video/*" onChange={handleFile} style={{ display: "none" }} />
       </div>
