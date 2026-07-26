@@ -1867,7 +1867,8 @@ function MyPostsSection({ currentUserId }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [openPost, setOpenPost] = useState(null);
-  const inputRef = useRef(null);
+  const photoInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   const load = async () => {
     if (!API_BASE) { setLoading(false); return; }
@@ -1907,7 +1908,8 @@ function MyPostsSection({ currentUserId }) {
       setError(err.message || "Échec de l'envoi.");
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      if (videoInputRef.current) videoInputRef.current.value = "";
     }
   };
 
@@ -1915,13 +1917,22 @@ function MyPostsSection({ currentUserId }) {
     <div style={{ marginTop: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes publications</label>
-        <button onClick={() => inputRef.current?.click()} disabled={uploading} style={{
-          display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-          borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
-        }}>
-          <Plus size={13} /> {uploading ? "Envoi..." : "Photo ou vidéo"}
-        </button>
-        <input ref={inputRef} type="file" accept="image/*,video/*" onChange={handleFile} style={{ display: "none" }} />
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => photoInputRef.current?.click()} disabled={uploading} style={{
+            display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+            borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
+          }}>
+            <Camera size={13} /> {uploading ? "Envoi..." : "Photo"}
+          </button>
+          <button onClick={() => videoInputRef.current?.click()} disabled={uploading} style={{
+            display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+            borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
+          }}>
+            <Video size={13} /> {uploading ? "Envoi..." : "Vidéo"}
+          </button>
+        </div>
+        <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
+        <input ref={videoInputRef} type="file" accept="video/*" onChange={handleFile} style={{ display: "none" }} />
       </div>
       {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{error}</p>}
       <div style={{ marginTop: 10 }}>
@@ -3679,7 +3690,62 @@ function MainApp() {
   );
 }
 
+function VerifyEmailScreen() {
+  const [status, setStatus] = useState("checking"); // "checking" | "success" | "error"
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (!token || !API_BASE) {
+      setStatus("error");
+      setMessage("Lien invalide.");
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Lien invalide ou déjà utilisé.");
+        setStatus("success");
+      } catch (e) {
+        setStatus("error");
+        setMessage(e.message || "Lien invalide ou déjà utilisé.");
+      }
+    })();
+  }, []);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#1B1223", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
+      <div style={{ maxWidth: 360 }}>
+        {status === "checking" && <p style={{ color: "#B39FBF", fontSize: 15 }}>Confirmation en cours...</p>}
+        {status === "success" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>✅</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Email confirmé !</p>
+            <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>Ton compte Lovinia est maintenant pleinement activé.</p>
+            <a href="/" style={{ display: "inline-block", background: "#FF6B5B", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>
+              Retourner sur Lovinia
+            </a>
+          </>
+        )}
+        {status === "error" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>⚠️</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Lien invalide</p>
+            <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>{message} Tu peux redemander un email de confirmation depuis ton profil.</p>
+            <a href="/" style={{ display: "inline-block", background: "rgba(255,255,255,0.08)", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14 }}>
+              Retourner sur Lovinia
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DatingAppMVP() {
   const isAdminRoute = typeof window !== "undefined" && window.location.search.includes("admin=true");
+  const isVerifyRoute = typeof window !== "undefined" && window.location.pathname.includes("verify-email");
+  if (isVerifyRoute) return <VerifyEmailScreen />;
   return isAdminRoute ? <AdminScreen /> : <MainApp />;
 }
