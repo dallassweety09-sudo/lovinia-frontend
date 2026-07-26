@@ -576,10 +576,11 @@ function DiscoverScreen({ onNewMatch }) {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/api/me/coins`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return; // Erreur passagère : on garde le solde précédemment affiché.
       const data = await res.json();
-      setCoins(data.coins);
+      if (typeof data.coins === "number") setCoins(data.coins);
     } catch {
-      // Silencieux.
+      // Silencieux : on garde le solde précédemment affiché plutôt que de l'effacer.
     }
   }, []);
 
@@ -1387,12 +1388,15 @@ function GiftPickerModal({ postId, onClose, onSent }) {
           fetch(`${API_BASE}/api/gifts/catalog`, { headers: authHeaders() }),
           fetch(`${API_BASE}/api/me/coins`, { headers: authHeaders() }),
         ]);
+        if (!gRes.ok) throw new Error("Impossible de charger la boutique pour le moment. Réessaie dans un instant.");
         const gData = await gRes.json();
-        const cData = await cRes.json();
         setGifts(gData.gifts || []);
-        setCoins(typeof cData.coins === "number" ? cData.coins : null);
-      } catch {
-        setGifts([]);
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          if (typeof cData.coins === "number") setCoins(cData.coins);
+        }
+      } catch (e) {
+        setError(e.message || "Impossible de charger la boutique pour le moment.");
       } finally {
         setLoading(false);
       }
@@ -1478,10 +1482,11 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/posts/${post.id}/gifts`, { headers: authHeaders() });
+        if (!res.ok) return; // Erreur passagère : on garde le compteur initial plutôt que de l'effacer.
         const data = await res.json();
-        setGiftTotal(data.total || 0);
+        if (typeof data.total === "number") setGiftTotal(data.total);
       } catch {
-        setGiftTotal(0);
+        // Silencieux : on garde le compteur initial.
       }
     })();
   }, [post.id]);
