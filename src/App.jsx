@@ -322,7 +322,7 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
       style={{
         position: "absolute",
         inset: 0,
-        borderRadius: 24,
+        borderRadius: 32,
         overflow: "hidden",
         boxShadow: "0 20px 40px rgba(20,8,28,0.45)",
         transform: `translate(${drag.x}px, ${drag.y}px) rotate(${rotate}deg)`,
@@ -815,8 +815,12 @@ function DiscoverScreen({ onNewMatch }) {
         <button onClick={() => swipe("pass")} style={btnCircle("#2A1B33", "#FF6B5B", 58)}>
           <X size={26} />
         </button>
-        <button onClick={() => swipe("like")} style={btnCircle("#FF6B5B", "#FBEFE9", 68)}>
-          <Heart size={30} fill="#FBEFE9" />
+        <button onClick={() => swipe("like")} style={{
+          ...btnCircle("transparent", "#2A0E12", 68),
+          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+          boxShadow: "0 14px 26px -8px rgba(232,84,138,0.55)",
+        }}>
+          <Heart size={30} fill="#2A0E12" />
         </button>
         <button onClick={() => swipe("like")} style={btnCircle("#2A1B33", "#F2B84B", 58)}>
           <Star size={24} fill="#F2B84B" />
