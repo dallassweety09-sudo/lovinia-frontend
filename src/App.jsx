@@ -1893,10 +1893,36 @@ function MyPostsSection({ currentUserId }) {
 
   useEffect(() => { load(); }, []);
 
+  // Lit la durée d'un fichier vidéo côté navigateur, avant même de l'envoyer vers Cloudinary.
+  const getVideoDuration = (file) =>
+    new Promise((resolve, reject) => {
+      const videoEl = document.createElement("video");
+      videoEl.preload = "metadata";
+      videoEl.onloadedmetadata = () => {
+        URL.revokeObjectURL(videoEl.src);
+        resolve(videoEl.duration);
+      };
+      videoEl.onerror = () => reject(new Error("Impossible de lire cette vidéo."));
+      videoEl.src = URL.createObjectURL(file);
+    });
+
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
+    if (file.type.startsWith("video/")) {
+      try {
+        const duration = await getVideoDuration(file);
+        if (duration > 10.5) {
+          setError(`Cette vidéo dure ${Math.round(duration)} secondes. Les vidéos sont limitées à 10 secondes maximum.`);
+          if (photoInputRef.current) photoInputRef.current.value = "";
+          if (videoInputRef.current) videoInputRef.current.value = "";
+          return;
+        }
+      } catch {
+        // Si la durée ne peut pas être lue, on laisse passer plutôt que de bloquer l'envoi à tort.
+      }
+    }
     setUploading(true);
     try {
       const { url, mediaType } = await uploadMediaToCloudinary(file);
@@ -1942,11 +1968,12 @@ function MyPostsSection({ currentUserId }) {
         <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
         <input ref={videoInputRef} type="file" accept="video/*" onChange={handleFile} style={{ display: "none" }} />
       </div>
+      <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 4 }}>Photos, ou vidéos de 10 secondes maximum. Likes, commentaires et cadeaux fonctionnent sur les deux.</p>
       {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{error}</p>}
       <div style={{ marginTop: 10 }}>
         {loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
         {!loading && posts.length === 0 && (
-          <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucune publication pour l'instant. Partage une photo ou une vidéo !</p>
+          <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucune publication pour l'instant. Ajoute une photo ou une vidéo !</p>
         )}
         <PostsGrid posts={posts} isOwner currentUserId={currentUserId} onOpen={setOpenPost} />
       </div>
