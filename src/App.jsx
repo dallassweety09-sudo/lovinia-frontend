@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -1894,6 +1894,76 @@ function UserPostsSection({ userId, currentUserId }) {
   );
 }
 
+function WalletModal({ onClose }) {
+  const [coins, setCoins] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(!!API_BASE);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    if (!API_BASE) { setLoading(false); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/me/wallet`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setCoins(data.coins ?? 0);
+      setTransactions(data.transactions || []);
+    } catch {
+      setError("Impossible de charger ton portefeuille pour le moment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Wallet size={18} color="#F2B84B" /> Mon portefeuille
+          </p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: "20px 18px", textAlign: "center", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ color: "#8C7A94", fontSize: 12, marginBottom: 6 }}>Solde actuel</p>
+          <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 34, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, margin: 0 }}>
+            <Coins size={26} /> {loading ? "..." : coins ?? 0}
+          </p>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>
+          <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Historique</p>
+          {error && (
+            <div>
+              <p style={{ color: "#FF6B5B", fontSize: 12, marginBottom: 8 }}>{error}</p>
+              <button onClick={load} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9", borderRadius: 10, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>Réessayer</button>
+            </div>
+          )}
+          {!error && loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
+          {!error && !loading && transactions.length === 0 && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucun mouvement pour l'instant.</p>}
+          {transactions.map((t) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <div>
+                <p style={{ color: "#FBEFE9", fontSize: 12.5, margin: 0 }}>{t.reason}</p>
+                <p style={{ color: "#6B5A73", fontSize: 10.5, margin: 0, marginTop: 2 }}>{formatMessageTime(t.created_at)}</p>
+              </div>
+              <span style={{ color: t.amount >= 0 ? "#3ECF6B" : "#FF6B5B", fontSize: 13.5, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>
+                {t.amount >= 0 ? "+" : ""}{t.amount}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [name, setName] = useState(user?.name || "Toi");
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
@@ -1916,6 +1986,12 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [emailVerified, setEmailVerified] = useState(true);
   const [resendStatus, setResendStatus] = useState("idle"); // "idle" | "sending" | "sent" | "error"
   const [legalOpen, setLegalOpen] = useState(null);
+  const [showMyPosts, setShowMyPosts] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
+  const [acceptGifts, setAcceptGifts] = useState(true);
+  const [giftSendersRestriction, setGiftSendersRestriction] = useState("everyone");
+  const [hideGiftCount, setHideGiftCount] = useState(false);
+  const [giftPrefsSaving, setGiftPrefsSaving] = useState(false);
 
   const handleEnablePush = async () => {
     setPushStatus("enabling");
@@ -1945,6 +2021,9 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setVerificationStatus(data.user.verification_status || "none");
           setInvisible(!!data.user.invisible);
           setEmailVerified(data.user.email_verified !== 0 && data.user.email_verified !== false);
+          setAcceptGifts(data.user.accept_gifts !== 0 && data.user.accept_gifts !== false);
+          setGiftSendersRestriction(data.user.gift_senders_restriction || "everyone");
+          setHideGiftCount(!!data.user.hide_gift_count);
         }
       } catch {
         // Silencieux : on garde les valeurs par défaut si le chargement échoue.
@@ -1965,6 +2044,31 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
     } catch {
       setResendStatus("error");
     }
+  };
+
+  const saveGiftPrefs = async (patch) => {
+    const next = { acceptGifts, giftSendersRestriction, hideGiftCount, ...patch };
+    setAcceptGifts(next.acceptGifts);
+    setGiftSendersRestriction(next.giftSendersRestriction);
+    setHideGiftCount(next.hideGiftCount);
+    setGiftPrefsSaving(true);
+    if (API_BASE) {
+      try {
+        const token = localStorage.getItem("token");
+        await fetch(`${API_BASE}/api/me`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            acceptGifts: next.acceptGifts,
+            giftSendersRestriction: next.giftSendersRestriction,
+            hideGiftCount: next.hideGiftCount,
+          }),
+        });
+      } catch {
+        // Erreur passagère : on garde quand même le choix affiché, l'utilisateur peut réessayer en re-basculant.
+      }
+    }
+    setGiftPrefsSaving(false);
   };
 
   const toggleInvisible = async () => {
@@ -2150,8 +2254,6 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         </div>
       </div>
 
-      <MyPostsSection currentUserId={user?.id} />
-
       <div style={{ marginTop: 20 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Bio</label>
         <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} style={{
@@ -2209,6 +2311,71 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
       </button>
 
+      <button onClick={() => setShowMyPosts((s) => !s)} style={{
+        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Video size={16} color="#8C7A94" /> Mes publications</span>
+        <ChevronRight size={16} color="#8C7A94" style={{ transform: showMyPosts ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+      </button>
+      {showMyPosts && <MyPostsSection currentUserId={user?.id} />}
+
+      <button onClick={() => setShowWallet(true)} style={{
+        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Wallet size={16} color="#F2B84B" /> Mon portefeuille (Coins)</span>
+        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+      </button>
+
+      <div style={{ marginTop: 12, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 14, fontWeight: 600 }}>
+            <Gift size={17} color="#F2B84B" /> Réception des cadeaux
+          </span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+          <span style={{ color: "#D8C4D0", fontSize: 13 }}>Accepter les cadeaux</span>
+          <button onClick={() => saveGiftPrefs({ acceptGifts: !acceptGifts })} disabled={giftPrefsSaving || !API_BASE} style={{
+            width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer",
+            background: acceptGifts ? "#F2B84B" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s",
+          }}>
+            <div style={{ width: 17, height: 17, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: acceptGifts ? 21 : 2, transition: "left 0.2s" }} />
+          </button>
+        </div>
+
+        {acceptGifts && (
+          <>
+            <p style={{ color: "#D8C4D0", fontSize: 13, marginTop: 16, marginBottom: 8 }}>Qui peut m'envoyer des cadeaux</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => saveGiftPrefs({ giftSendersRestriction: "everyone" })} style={{
+                flex: 1, padding: "9px 0", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+                background: giftSendersRestriction === "everyone" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+              }}>Tout le monde</button>
+              <button onClick={() => saveGiftPrefs({ giftSendersRestriction: "verified_only" })} style={{
+                flex: 1, padding: "9px 0", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+                background: giftSendersRestriction === "verified_only" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
+                color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+              }}>Profils vérifiés</button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+              <span style={{ color: "#D8C4D0", fontSize: 13 }}>Masquer le compteur de cadeaux</span>
+              <button onClick={() => saveGiftPrefs({ hideGiftCount: !hideGiftCount })} disabled={giftPrefsSaving || !API_BASE} style={{
+                width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer",
+                background: hideGiftCount ? "#F2B84B" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s",
+              }}>
+                <div style={{ width: 17, height: 17, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: hideGiftCount ? 21 : 2, transition: "left 0.2s" }} />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       <button
         onClick={handleEnablePush}
         disabled={pushStatus === "enabling" || pushStatus === "enabled" || !API_BASE}
@@ -2227,6 +2394,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {pushError && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{pushError}</p>}
 
       {showVisitors && <VisitorsModal onClose={() => setShowVisitors(false)} />}
+      {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
 
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <p style={{ color: "#D8C4D0", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
@@ -2916,13 +3084,18 @@ function GiftsAdminSection({ adminKey }) {
   const [error, setError] = useState("");
   const [newGift, setNewGift] = useState({ name: "", icon: "", priceCoins: "" });
   const [creating, setCreating] = useState(false);
+  const [revenue, setRevenue] = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/gifts`, { headers: { "x-admin-key": adminKey } });
-      const data = await res.json();
-      setGifts(data.gifts || []);
+      const [gRes, rRes] = await Promise.all([
+        fetch(`${API_BASE}/api/admin/gifts`, { headers: { "x-admin-key": adminKey } }),
+        fetch(`${API_BASE}/api/admin/revenue`, { headers: { "x-admin-key": adminKey } }),
+      ]);
+      const gData = await gRes.json();
+      setGifts(gData.gifts || []);
+      if (rRes.ok) setRevenue(await rRes.json());
     } catch {
       setError("Impossible de charger la boutique.");
     } finally {
@@ -2973,7 +3146,22 @@ function GiftsAdminSection({ adminKey }) {
   return (
     <div>
       <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 24, marginBottom: 6 }}>Boutique de cadeaux</p>
-      <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 20 }}>Le destinataire d'un cadeau reçoit 50% de sa valeur en Coins.</p>
+      <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 16 }}>Le destinataire d'un cadeau reçoit 70% de sa valeur en Coins ; 30% reviennent à la plateforme.</p>
+
+      {revenue && (
+        <div style={{ background: "rgba(242,184,75,0.1)", border: "1px solid rgba(242,184,75,0.3)", borderRadius: 14, padding: 16, marginBottom: 20, display: "flex", gap: 24 }}>
+          <div>
+            <p style={{ color: "#8C7A94", fontSize: 11, marginBottom: 4 }}>Revenu plateforme (commission 30%)</p>
+            <p style={{ color: "#F2B84B", fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              <Coins size={18} /> {revenue.totalCoins}
+            </p>
+          </div>
+          <div>
+            <p style={{ color: "#8C7A94", fontSize: 11, marginBottom: 4 }}>Cadeaux envoyés au total</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, margin: 0 }}>{revenue.giftsSentCount}</p>
+          </div>
+        </div>
+      )}
       {error && <p style={{ color: "#FF6B5B", fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
       {loading && <p style={{ color: "#B39FBF" }}>Chargement...</p>}
 
