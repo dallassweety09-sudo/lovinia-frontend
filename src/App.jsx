@@ -1006,8 +1006,8 @@ function MessagesScreen({ conversations, onOpenChat }) {
 
   return (
     <div style={{ padding: "18px 18px 0" }}>
-      <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Messages</span>
-      <div style={{ marginTop: 12 }}>
+      <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 800, color: "#FBEFE9" }}>Messages</span>
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
         {loading && <p style={{ color: "#B39FBF", fontSize: 14, marginTop: 20, textAlign: "center" }}>Chargement...</p>}
         {!loading && list.length === 0 && (
           <p style={{ color: "#D8C4D0", fontSize: 14, marginTop: 40, textAlign: "center" }}>
@@ -1016,8 +1016,11 @@ function MessagesScreen({ conversations, onOpenChat }) {
         )}
         {list.map((c) => (
           <div key={c.id} onClick={() => onOpenChat(c)} style={{
-            display: "flex", alignItems: "center", gap: 12, padding: "12px 4px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+            borderRadius: 20, cursor: "pointer",
+            background: c.unread ? "rgba(255,255,255,0.055)" : "rgba(255,255,255,0.025)",
+            border: `1px solid ${c.unread ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)"}`,
+            backdropFilter: "blur(16px)",
           }}>
             <div style={{ position: "relative", flexShrink: 0 }}>
               <img src={c.img} alt={c.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />
@@ -1027,15 +1030,15 @@ function MessagesScreen({ conversations, onOpenChat }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#FBEFE9", fontWeight: 600, fontSize: 15 }}>{c.name}</span>
-                <span style={{ color: "#B39FBF", fontSize: 12 }}>{c.time}</span>
+                <span style={{ color: "#FBEFE9", fontWeight: 700, fontSize: 14.5, fontFamily: "Manrope, sans-serif" }}>{c.name}</span>
+                <span style={{ color: "#8B7A93", fontSize: 11.5 }}>{c.time}</span>
               </div>
               <p style={{
-                color: c.unread ? "#FBEFE9" : "#B39FBF", fontSize: 13, margin: "2px 0 0",
+                color: c.unread ? "#F0E3EC" : "#8B7A93", fontSize: 13, margin: "2px 0 0",
                 fontWeight: c.unread ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               }}>{c.lastMsg}</p>
             </div>
-            {c.unread && <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#FF6B5B" }} />}
+            {c.unread && <div style={{ width: 9, height: 9, borderRadius: "50%", background: "linear-gradient(120deg, #FF6B5B, #9B5DE5)", flexShrink: 0 }} />}
           </div>
         ))}
       </div>
@@ -1291,8 +1294,10 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
           return (
             <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
               <div style={{
-                background: mine ? "#FF6B5B" : "rgba(255,255,255,0.1)",
-                color: "#FBEFE9", padding: "9px 14px", borderRadius: 16, maxWidth: "75%", fontSize: 14,
+                background: mine ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 60%, #9B5DE5 100%)" : "rgba(255,255,255,0.08)",
+                border: mine ? "none" : "1px solid rgba(255,255,255,0.1)",
+                color: mine ? "#2A0E12" : "#F0E3EC", fontWeight: mine ? 600 : 400,
+                padding: "10px 15px", borderRadius: mine ? "18px 18px 4px 18px" : "18px 18px 18px 4px", maxWidth: "75%", fontSize: 14,
               }}>{m.text}</div>
               {isLastMine && API_BASE && (
                 <span style={{ color: "#8C7A94", fontSize: 10.5, marginTop: 3, marginRight: 2 }}>
@@ -1315,11 +1320,14 @@ function ChatScreen({ conversation, currentUserId, onBack, onSend, onViewProfile
           onKeyDown={(e) => { if (e.key === "Enter") send(); }}
           placeholder="Écris un message..."
           style={{
-            flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: 20, padding: "10px 16px", color: "#FBEFE9", fontSize: 14, outline: "none",
+            flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 999, padding: "11px 18px", color: "#FBEFE9", fontSize: 14, outline: "none",
           }}
         />
-        <button onClick={send} style={btnCircle("#FF6B5B", "#FBEFE9", 40)}>
+        <button onClick={send} style={{
+          ...btnCircle("transparent", "#2A0E12", 42),
+          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+        }}>
           <Send size={16} />
         </button>
       </div>
