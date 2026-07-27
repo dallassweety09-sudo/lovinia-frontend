@@ -2329,18 +2329,24 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       )}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 20 }}>
         <div style={{
-          width: 96, height: 96, borderRadius: "50%", background: "#3A2645", overflow: "hidden",
-          display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #FF6B5B",
+          width: 100, height: 100, borderRadius: "50%",
+          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+          padding: 3, display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          {photos[0] ? (
-            <img src={photos[0]} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <User size={40} color="#F2B84B" />
-          )}
+          <div style={{
+            width: "100%", height: "100%", borderRadius: "50%", background: "#3A2645", overflow: "hidden",
+            display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #0A0611",
+          }}>
+            {photos[0] ? (
+              <img src={photos[0]} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <User size={40} color="#F2B84B" />
+            )}
+          </div>
         </div>
         <input value={name} onChange={(e) => setName(e.target.value)} style={{
           background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)",
-          color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, textAlign: "center",
+          color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 700, textAlign: "center",
           marginTop: 14, padding: "4px 0", outline: "none", width: 200,
         }} />
         {verificationStatus === "verified" && (
@@ -2423,8 +2429,9 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 
       {API_BASE && (
         <button onClick={save} disabled={saving} style={{
-          marginTop: 20, width: "100%", padding: "12px 0", borderRadius: 14, cursor: saving ? "default" : "pointer",
-          background: saved ? "#6BE0A8" : "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 14, fontWeight: 600,
+          marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 999, cursor: saving ? "default" : "pointer",
+          background: saved ? "#6BE0A8" : "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+          color: saved ? "#0F3322" : "#2A0E12", border: "none", fontSize: 14.5, fontWeight: 800, fontFamily: "Manrope, sans-serif",
           opacity: saving ? 0.7 : 1,
         }}>
           {saving ? "Enregistrement..." : saved ? "Enregistré ✓" : "Enregistrer les modifications"}
@@ -2549,8 +2556,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       </div>
 
       <button onClick={onLogout} style={{
-        marginTop: 16, width: "100%", padding: "12px 0", borderRadius: 14, cursor: "pointer",
-        background: "rgba(255,255,255,0.06)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 14,
+        marginTop: 16, width: "100%", padding: "13px 0", borderRadius: 999, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 14, fontFamily: "Manrope, sans-serif", fontWeight: 700,
       }}>Se déconnecter</button>
 
       {!confirmDelete ? (
@@ -3515,22 +3522,25 @@ function AdminScreen() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#1B1223", padding: 24, fontFamily: "Inter, sans-serif" }}>
+    <div style={{
+      minHeight: "100vh", padding: 24, fontFamily: "Inter, sans-serif",
+      background: "radial-gradient(1200px 700px at 15% -10%, rgba(139,92,246,0.14), transparent 60%), radial-gradient(1000px 600px at 90% 10%, rgba(232,84,138,0.1), transparent 55%), #0A0611",
+    }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
         <button onClick={() => setTab("verifications")} style={{
-          padding: "8px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13.5,
-          background: tab === "verifications" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
-          color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+          padding: "9px 18px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          background: tab === "verifications" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+          color: tab === "verifications" ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.12)",
         }}>Vérifications</button>
         <button onClick={() => setTab("gifts")} style={{
-          padding: "8px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13.5,
-          background: tab === "gifts" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
-          color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+          padding: "9px 18px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          background: tab === "gifts" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+          color: tab === "gifts" ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.12)",
         }}>Boutique de cadeaux</button>
         <button onClick={() => setTab("moderation")} style={{
-          padding: "8px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13.5,
-          background: tab === "moderation" ? "#FF6B5B" : "rgba(255,255,255,0.08)",
-          color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+          padding: "9px 18px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          background: tab === "moderation" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+          color: tab === "moderation" ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.12)",
         }}>Modération</button>
       </div>
 
