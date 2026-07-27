@@ -366,7 +366,7 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
           <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
-          {profile.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
+          {profile.verification_status === "verified" && <BadgeCheck size={20} color="#A78BFA" fill="#1B1223" />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
           <MapPin size={13} /> {profile.city}{profile.profession ? ` · ${profile.profession}` : ""}
@@ -479,9 +479,9 @@ function FiltersPanel({ filters, onApply, onClose }) {
           border: draft.verifiedOnly ? "1px solid rgba(79,168,255,0.4)" : "1px solid rgba(255,255,255,0.12)",
         }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 13.5 }}>
-            <BadgeCheck size={16} color={draft.verifiedOnly ? "#4FA8FF" : "#8C7A94"} /> Profils vérifiés uniquement
+            <BadgeCheck size={16} color={draft.verifiedOnly ? "#A78BFA" : "#8C7A94"} /> Profils vérifiés uniquement
           </span>
-          <div style={{ width: 34, height: 19, borderRadius: 999, background: draft.verifiedOnly ? "#4FA8FF" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
+          <div style={{ width: 34, height: 19, borderRadius: 999, background: draft.verifiedOnly ? "#A78BFA" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s" }}>
             <div style={{ width: 15, height: 15, borderRadius: "50%", background: "#FBEFE9", position: "absolute", top: 2, left: draft.verifiedOnly ? 17 : 2, transition: "left 0.2s" }} />
           </div>
         </button>
@@ -1103,7 +1103,7 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{p.name}</span>
             {p.age ? <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#E7D4E0" }}>{p.age}</span> : null}
-            {p.verification_status === "verified" && <BadgeCheck size={20} color="#4FA8FF" fill="#1B1223" />}
+            {p.verification_status === "verified" && <BadgeCheck size={20} color="#A78BFA" fill="#1B1223" />}
           </div>
           {(p.city || p.profession) && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
@@ -1165,8 +1165,8 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
         <UserPostsSection userId={p.id} currentUserId={currentUserId} />
 
         <button onClick={onMessage} style={{
-          width: "100%", padding: "14px 0", borderRadius: 16, cursor: "pointer",
-          background: "#FF6B5B", color: "#FBEFE9", border: "none", fontSize: 15, fontWeight: 600,
+          width: "100%", padding: "14px 0", borderRadius: 999, cursor: "pointer",
+          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)", color: "#2A0E12", border: "none", fontSize: 15, fontWeight: 800, fontFamily: "Manrope, sans-serif",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
         }}>
           <MessageCircle size={18} /> Envoyer un message
@@ -2336,7 +2336,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           marginTop: 14, padding: "4px 0", outline: "none", width: 200,
         }} />
         {verificationStatus === "verified" && (
-          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#4FA8FF", fontSize: 12.5, marginTop: 6 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#A78BFA", fontSize: 12.5, marginTop: 6 }}>
             <BadgeCheck size={15} /> Profil vérifié
           </span>
         )}
@@ -2344,12 +2344,12 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 
       <div style={{ marginTop: 22, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <BadgeCheck size={17} color={verificationStatus === "verified" ? "#4FA8FF" : "#8C7A94"} />
+          <BadgeCheck size={17} color={verificationStatus === "verified" ? "#A78BFA" : "#8C7A94"} />
           <span style={{ color: "#FBEFE9", fontSize: 14, fontWeight: 600 }}>Badge de vérification</span>
         </div>
 
         {verificationStatus === "verified" && (
-          <p style={{ color: "#4FA8FF", fontSize: 13, marginTop: 8 }}>Ton profil est vérifié ✓</p>
+          <p style={{ color: "#A78BFA", fontSize: 13, marginTop: 8 }}>Ton profil est vérifié ✓</p>
         )}
         {verificationStatus === "pending" && (
           <p style={{ color: "#F2B84B", fontSize: 13, marginTop: 8 }}>Ton selfie est en cours d'examen. On te tiendra au courant !</p>
@@ -2369,7 +2369,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
               style={{
                 marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 width: "100%", padding: "11px 0", borderRadius: 12, cursor: verifUploading ? "default" : "pointer",
-                background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)",
+                background: "rgba(79,168,255,0.15)", color: "#A78BFA", border: "1px solid rgba(79,168,255,0.4)",
                 fontSize: 13.5, fontWeight: 600, opacity: verifUploading ? 0.7 : 1,
               }}
             >
@@ -3328,7 +3328,7 @@ function GiftsAdminSection({ adminKey }) {
             <button onClick={() => updateGift(g.id, { active: g.active ? 0 : 1 })} style={{
               width: "100%", padding: "7px 0", borderRadius: 8, cursor: "pointer", fontSize: 12,
               background: g.active ? "rgba(255,107,91,0.15)" : "rgba(79,168,255,0.15)",
-              color: g.active ? "#FF6B5B" : "#4FA8FF",
+              color: g.active ? "#FF6B5B" : "#A78BFA",
               border: `1px solid ${g.active ? "rgba(255,107,91,0.35)" : "rgba(79,168,255,0.4)"}`,
             }}>{g.active ? "Désactiver" : "Réactiver"}</button>
           </div>
@@ -3422,7 +3422,7 @@ function ModerationAdminSection({ adminKey }) {
               }}>Refuser</button>
               <button onClick={() => decide(p.id, "approved")} style={{
                 flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
-                background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)", fontSize: 12.5,
+                background: "rgba(79,168,255,0.15)", color: "#A78BFA", border: "1px solid rgba(79,168,255,0.4)", fontSize: 12.5,
               }}>Approuver</button>
             </div>
           </div>
@@ -3557,7 +3557,7 @@ function AdminScreen() {
               }}>Refuser</button>
               <button onClick={() => decide(u.id, true)} style={{
                 flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
-                background: "rgba(79,168,255,0.15)", color: "#4FA8FF", border: "1px solid rgba(79,168,255,0.4)", fontSize: 13,
+                background: "rgba(79,168,255,0.15)", color: "#A78BFA", border: "1px solid rgba(79,168,255,0.4)", fontSize: 13,
               }}>Valider</button>
             </div>
           </div>
@@ -3717,12 +3717,22 @@ function MainApp() {
 
       {matchToast && (
         <div style={{
-          position: "absolute", inset: 0, background: "rgba(27,18,35,0.92)", display: "flex",
-          flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 50, gap: 10,
+          position: "absolute", inset: 0,
+          background: "radial-gradient(circle at 50% 32%, rgba(232,84,138,0.28), rgba(10,6,17,0.95) 62%)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 50, gap: 14,
         }}>
-          <Heart size={54} color="#FF6B5B" fill="#FF6B5B" />
-          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 26, color: "#FBEFE9", fontWeight: 700 }}>C'est un match !</span>
-          <span style={{ color: "#D8C4D0", fontSize: 14 }}>Toi et {matchToast.name}, vous vous êtes likés</span>
+          <div style={{
+            width: 96, height: 96, borderRadius: "50%", padding: 3,
+            background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+          }}>
+            <img src={matchToast.img} alt={matchToast.name} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "3px solid #0A0611" }} />
+          </div>
+          <span style={{
+            fontFamily: "Manrope, sans-serif", fontSize: 28, fontWeight: 800,
+            background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+            WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+          }}>C'est un match !</span>
+          <span style={{ color: "#C6B4C9", fontSize: 13.5 }}>Toi et {matchToast.name}, vous vous êtes likés</span>
         </div>
       )}
     </div>
