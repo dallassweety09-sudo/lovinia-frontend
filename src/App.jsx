@@ -2594,12 +2594,15 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 4, marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 4, marginBottom: 20, flexWrap: "wrap" }}>
         <button onClick={() => setLegalOpen("terms")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
           Conditions d'utilisation
         </button>
         <button onClick={() => setLegalOpen("privacy")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
           Politique de confidentialité
+        </button>
+        <button onClick={() => setLegalOpen("child-safety")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
+          Sécurité des mineurs
         </button>
       </div>
       {legalOpen && <LegalModal type={legalOpen} onClose={() => setLegalOpen(null)} />}
@@ -2861,9 +2864,51 @@ Les présentes conditions peuvent évoluer. Les utilisateurs seront informés de
 12. CONTACT
 Pour toute question relative à ces conditions, contacte-nous via les coordonnées disponibles dans l'application.`;
 
+const CHILD_SAFETY_STANDARDS_TEXT = `Dernière mise à jour : ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+
+1. ENGAGEMENT
+Lovinia a une politique de tolérance zéro envers l'exploitation et les abus sexuels sur mineurs (CSAE — Child Sexual Abuse and Exploitation), sous toute forme, y compris la sollicitation, le partage de contenu, ou toute tentative de mise en relation impliquant un mineur.
+
+2. ÂGE MINIMUM ET VÉRIFICATION
+Lovinia est strictement réservé aux personnes de 18 ans et plus.
+- La date de naissance est obligatoire et vérifiée à l'inscription ; toute personne déclarant moins de 18 ans est automatiquement refusée.
+- Cette vérification s'applique aussi à toute modification ultérieure du profil.
+- Les comptes suspectés d'appartenir à un mineur, quelle que soit la date de naissance déclarée, peuvent être suspendus par un modérateur en cas de doute raisonnable (photos, contenu, signalement).
+
+3. MODÉRATION DES CONTENUS
+- Toute photo ou vidéo publiée sur l'application passe par une file de modération avant d'être visible par les autres utilisateurs.
+- Le contenu suspecté de représenter un mineur, ou à caractère sexuel impliquant potentiellement un mineur, est immédiatement rejeté et le compte concerné suspendu dans l'attente d'investigation.
+
+4. DÉTECTION ET SIGNALEMENT
+- Chaque profil, publication, message et commentaire peut être signalé directement depuis l'application par n'importe quel utilisateur.
+- Les signalements concernant un mineur (présumé ou avéré) sont traités en priorité absolue.
+- Lovinia coopère avec les autorités compétentes et les organismes de protection de l'enfance (tels que le NCMEC aux États-Unis ou les autorités locales équivalentes) en cas de détection de contenu ou de comportement relevant du CSAE, conformément aux obligations légales applicables.
+
+5. POINT DE CONTACT SÉCURITÉ DÉSIGNÉ
+Pour tout signalement urgent concernant la sécurité d'un mineur, ou toute question relative à cette politique :
+Email : safety@lovinia.fr
+Ce contact est traité en priorité et distinct du support client général.
+
+6. ACTIONS EN CAS DE VIOLATION
+Toute violation avérée de cette politique entraîne :
+- La suspension immédiate et définitive du compte concerné.
+- La conservation des preuves nécessaires à une éventuelle procédure judiciaire.
+- Le signalement aux autorités compétentes lorsque la loi l'exige ou le permet.
+
+7. PRÉVENTION
+Lovinia met en œuvre les mesures suivantes pour prévenir les abus :
+- Vérification d'identité par selfie disponible (badge de vérification), utilisée notamment pour renforcer la confiance entre utilisateurs.
+- Restriction de l'échange de coordonnées personnelles externes aux seuls comptes vérifiés, réduisant les tentatives de contournement de la modération.
+- Limitation du taux de création de comptes (anti-abus) pour freiner la création de faux comptes en masse.
+
+8. CONTACT GÉNÉRAL
+Pour toute autre question, contacte-nous via les coordonnées disponibles dans l'application ou à contact@lovinia.fr.`;
+
 function LegalModal({ type, onClose }) {
-  const title = type === "privacy" ? "Politique de confidentialité" : "Conditions d'utilisation";
-  const text = type === "privacy" ? PRIVACY_POLICY_TEXT : TERMS_OF_SERVICE_TEXT;
+  const titles = { privacy: "Politique de confidentialité", terms: "Conditions d'utilisation", "child-safety": "Standards de protection des mineurs" };
+  const texts = { privacy: PRIVACY_POLICY_TEXT, terms: TERMS_OF_SERVICE_TEXT, "child-safety": CHILD_SAFETY_STANDARDS_TEXT };
+  const title = titles[type] || titles.privacy;
+  const text = texts[type] || texts.privacy;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 18, width: "100%", maxWidth: 480, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -2873,6 +2918,30 @@ function LegalModal({ type, onClose }) {
         </div>
         <div style={{ padding: "16px 18px", overflowY: "auto" }}>
           <p style={{ color: "#D8C4D0", fontSize: 12.5, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{text}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Page légale publique, accessible SANS connexion (ex: lovinia.fr/legal?doc=privacy) —
+// nécessaire pour la soumission Google Play / Apple, qui exigent un lien public direct.
+function PublicLegalScreen() {
+  const doc = new URLSearchParams(window.location.search).get("doc") || "privacy";
+  const titles = { privacy: "Politique de confidentialité", terms: "Conditions d'utilisation", "child-safety": "Standards de protection des mineurs" };
+  const texts = { privacy: PRIVACY_POLICY_TEXT, terms: TERMS_OF_SERVICE_TEXT, "child-safety": CHILD_SAFETY_STANDARDS_TEXT };
+  const title = titles[doc] || titles.privacy;
+  const text = texts[doc] || texts.privacy;
+  return (
+    <div style={{ minHeight: "100vh", background: "#0A0611", padding: "48px 20px 80px", fontFamily: "Inter, sans-serif" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto" }}>
+        <p style={{ fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 22, color: "#FBEFE9", marginBottom: 6 }}>Lovinia</p>
+        <p style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 26, color: "#FBEFE9", marginBottom: 24 }}>{title}</p>
+        <p style={{ color: "#D8C4D0", fontSize: 13.5, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{text}</p>
+        <div style={{ marginTop: 40, display: "flex", gap: 16 }}>
+          <a href="/legal?doc=privacy" style={{ color: "#F2B84B", fontSize: 12.5, textDecoration: "underline" }}>Confidentialité</a>
+          <a href="/legal?doc=terms" style={{ color: "#F2B84B", fontSize: 12.5, textDecoration: "underline" }}>CGU</a>
+          <a href="/legal?doc=child-safety" style={{ color: "#F2B84B", fontSize: 12.5, textDecoration: "underline" }}>Sécurité des mineurs</a>
         </div>
       </div>
     </div>
@@ -3813,6 +3882,8 @@ function VerifyEmailScreen() {
 export default function DatingAppMVP() {
   const isAdminRoute = typeof window !== "undefined" && window.location.search.includes("admin=true");
   const isVerifyRoute = typeof window !== "undefined" && window.location.pathname.includes("verify-email");
+  const isLegalRoute = typeof window !== "undefined" && window.location.pathname.includes("legal");
+  if (isLegalRoute) return <PublicLegalScreen />;
   if (isVerifyRoute) return <VerifyEmailScreen />;
   return isAdminRoute ? <AdminScreen /> : <MainApp />;
 }
