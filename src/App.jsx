@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -2948,6 +2948,209 @@ function PublicLegalScreen() {
   );
 }
 
+function OnboardingScreens({ onDone }) {
+  const [step, setStep] = useState(0); // 0 = Bienvenue, 1 = Philosophie
+
+  const dots = (
+    <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 18 }}>
+      {[0, 1].map((i) => (
+        <div key={i} style={{
+          width: i === step ? 22 : 7, height: 7, borderRadius: 999, transition: "width 0.25s",
+          background: i === step ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.18)",
+        }} />
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{
+      flex: 1, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden",
+      background: "radial-gradient(900px 500px at 20% -10%, rgba(155,93,229,0.25), transparent 60%), radial-gradient(700px 500px at 100% 10%, rgba(232,84,138,0.2), transparent 55%), #0A0611",
+    }}>
+      {/* Halo décoratif animé en fond, façon "glow" premium */}
+      <div style={{
+        position: "absolute", top: "8%", left: "50%", transform: "translateX(-50%)",
+        width: 260, height: 260, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(255,107,91,0.35), transparent 70%)",
+        filter: "blur(10px)", animation: "onboardGlow 5s ease-in-out infinite",
+      }} />
+      <style>{`
+        @keyframes onboardGlow { 0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); } 50% { opacity: 1; transform: translateX(-50%) scale(1.12); } }
+        @keyframes floatIcon { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes walkGlow { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+      `}</style>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "40px 26px 10px", position: "relative", zIndex: 1 }}>
+        {step === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+            <div style={{ position: "relative", width: 90, height: 70, marginBottom: 14 }}>
+              <Heart size={64} color="#FF6B5B" style={{ position: "absolute", left: 0, top: 6 }} />
+              <Heart size={64} fill="#E8548A" color="#E8548A" style={{ position: "absolute", right: 0, top: 0 }} />
+            </div>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 34, color: "#FBEFE9", margin: 0 }}>Lovinia</p>
+            <p style={{
+              fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13, letterSpacing: "0.12em",
+              background: "linear-gradient(120deg, #FF6B5B, #E8548A)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+              marginTop: 4, textTransform: "uppercase",
+            }}>Connectez les cœurs</p>
+
+            <p style={{ color: "#C6B4C9", fontSize: 13.5, lineHeight: 1.7, marginTop: 18, maxWidth: 300 }}>
+              Lovinia est l'application de rencontre qui vous aide à créer de vraies connexions.
+              Sécurisée, authentique et conçue pour des relations qui ont du sens.
+            </p>
+
+            <div style={{ width: "100%", marginTop: 26, display: "flex", flexDirection: "column", gap: 14, textAlign: "left" }}>
+              {[
+                { icon: <BadgeCheck size={19} color="#A78BFA" />, title: "Profils vérifiés", desc: "Badge bleu après vérification selfie, pour plus de confiance." },
+                { icon: <Heart size={19} color="#FF6B5B" fill="#FF6B5B" />, title: "Matchs de qualité", desc: "Des connexions basées sur vos préférences et vos centres d'intérêt." },
+                { icon: <Lock size={19} color="#F2B84B" />, title: "Sécurisé & privé", desc: "Vos données sont protégées, votre sécurité est notre priorité." },
+                { icon: <Gem size={19} color="#E8548A" />, title: "Expérience Premium", desc: "Options VIP pour profiter de toutes les fonctionnalités sans limites." },
+              ].map((f, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {f.icon}
+                  </div>
+                  <div>
+                    <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 13.5, margin: 0 }}>{f.title}</p>
+                    <p style={{ color: "#8B7A93", fontSize: 12, margin: "2px 0 0", lineHeight: 1.4 }}>{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              width: "100%", marginTop: 28, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20, padding: 16, backdropFilter: "blur(16px)",
+            }}>
+              <p style={{
+                textAlign: "center", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 11, letterSpacing: "0.1em",
+                color: "#E8548A", textTransform: "uppercase", margin: "0 0 12px",
+              }}>Fonctionnalités clés</p>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ flex: 1, display: "flex", gap: 8 }}>
+                  <User size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <p style={{ color: "#FBEFE9", fontSize: 12, fontWeight: 700, margin: 0 }}>Matchs limités</p>
+                    <p style={{ color: "#8B7A93", fontSize: 10.5, margin: "2px 0 0" }}>Hommes : 20/jour<br />Femmes : 40/jour</p>
+                  </div>
+                </div>
+                <div style={{ flex: 1, display: "flex", gap: 8 }}>
+                  <MessageCircle size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <p style={{ color: "#FBEFE9", fontSize: 12, fontWeight: 700, margin: 0 }}>Messagerie</p>
+                    <p style={{ color: "#8B7A93", fontSize: 10.5, margin: "2px 0 0" }}>Discute uniquement avec tes matchs</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+            <div style={{ position: "relative", width: 60, height: 46, marginBottom: 10 }}>
+              <Heart size={40} color="#FF6B5B" style={{ position: "absolute", left: 0, top: 4 }} />
+              <Heart size={40} fill="#E8548A" color="#E8548A" style={{ position: "absolute", right: 0, top: 0 }} />
+            </div>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 22, color: "#FBEFE9", margin: 0 }}>Lovinia</p>
+            <p style={{
+              fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em",
+              color: "#E8548A", marginTop: 2, textTransform: "uppercase",
+            }}>Connectez les cœurs</p>
+
+            {/* Arche VIP stylisée, façon "porte lumineuse" avec icônes flottantes */}
+            <div style={{ position: "relative", width: "100%", maxWidth: 280, height: 220, marginTop: 22 }}>
+              {[
+                { icon: <Star size={18} color="#F2B84B" />, top: 6, left: 30 },
+                { icon: <Crown size={18} color="#F2B84B" />, top: 0, right: 20 },
+                { icon: <Gem size={18} color="#A78BFA" />, top: 60, left: 0 },
+                { icon: <Zap size={18} color="#A78BFA" />, top: 55, right: -4 },
+              ].map((it, i) => (
+                <div key={i} style={{
+                  position: "absolute", top: it.top, left: it.left, right: it.right,
+                  width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(242,184,75,0.4)", display: "flex", alignItems: "center", justifyContent: "center",
+                  animation: `floatIcon ${2.6 + i * 0.4}s ease-in-out infinite`,
+                }}>{it.icon}</div>
+              ))}
+              <div style={{
+                position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
+                width: 130, height: 170, borderRadius: "70px 70px 0 0",
+                background: "linear-gradient(180deg, rgba(232,84,138,0.16), rgba(155,93,229,0.1))",
+                border: "2px solid rgba(232,84,138,0.5)", boxShadow: "0 0 40px rgba(232,84,138,0.35)",
+                display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 14,
+              }}>
+                <p style={{
+                  fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 18, letterSpacing: "0.06em",
+                  background: "linear-gradient(120deg, #F2B84B, #FF6B5B)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                }}>VIP</p>
+              </div>
+              <div style={{
+                position: "absolute", bottom: 6, left: 0, right: 0, height: 3, borderRadius: 2,
+                background: "linear-gradient(90deg, #9B5DE5, #E8548A, #F2B84B, #9B5DE5)",
+                backgroundSize: "200% 100%", animation: "walkGlow 3s linear infinite",
+              }} />
+            </div>
+
+            <div style={{
+              width: "100%", marginTop: 20, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)",
+              borderRadius: 18, padding: "14px 18px",
+            }}>
+              <p style={{ color: "#A78BFA", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 10px" }}>Gratuit</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, textAlign: "left" }}>
+                {["Inscription", "Matchs", "Messages", "Rencontres"].map((t) => (
+                  <div key={t} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Check size={14} color="#3ECF6B" /> <span style={{ color: "#FBEFE9", fontSize: 12.5 }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.5, marginTop: 22 }}>
+              Rencontrez <span style={{ color: "#3ECF6B" }}>gratuitement</span>.<br />
+              Passez au <span style={{
+                background: "linear-gradient(120deg, #F2B84B, #FF6B5B)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+              }}>VIP</span> uniquement si vous voulez aller plus loin.
+            </p>
+
+            <div style={{ display: "flex", gap: 22, marginTop: 22 }}>
+              {[
+                { icon: <Heart size={20} color="#FF6B5B" fill="#FF6B5B" />, label: "L'amour est gratuit" },
+                { icon: <Gem size={20} color="#E8548A" />, label: "Avantages Premium" },
+                { icon: <Crown size={20} color="#F2B84B" />, label: "Allez plus loin en VIP" },
+              ].map((it, i) => (
+                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 78 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+                    {it.icon}
+                  </div>
+                  <p style={{ color: "#C6B4C9", fontSize: 10, textAlign: "center", lineHeight: 1.3, margin: 0, fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>{it.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "10px 26px 30px", position: "relative", zIndex: 1 }}>
+        {dots}
+        <button
+          onClick={() => (step === 0 ? setStep(1) : onDone())}
+          style={{
+            width: "100%", padding: "15px 0", borderRadius: 999, border: "none", cursor: "pointer",
+            background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+            color: "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 15,
+          }}
+        >
+          Suivant
+        </button>
+        {step === 0 && (
+          <button onClick={onDone} style={{ width: "100%", background: "none", border: "none", color: "#6B5A73", fontSize: 12.5, marginTop: 12, cursor: "pointer", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
+            Passer
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("register"); // "register" | "login" | "complete-google"
   const [step, setStep] = useState(0);
@@ -3659,6 +3862,9 @@ function AdminScreen() {
 function MainApp() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(!!API_BASE);
+  const [onboardingDone, setOnboardingDone] = useState(() => {
+    try { return localStorage.getItem("lovinia_onboarding_seen") === "true"; } catch { return false; }
+  });
   const [tab, setTab] = useState("discover");
   const [matches, setMatches] = useState([]);
   const [conversations, setConversations] = useState(CONVERSATIONS);
@@ -3760,6 +3966,11 @@ function MainApp() {
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Heart size={30} color="#FF6B5B" fill="#FF6B5B" style={{ opacity: 0.6 }} />
         </div>
+      ) : !user && !onboardingDone ? (
+        <OnboardingScreens onDone={() => {
+          try { localStorage.setItem("lovinia_onboarding_seen", "true"); } catch {}
+          setOnboardingDone(true);
+        }} />
       ) : !user ? (
         <AuthScreen onAuth={setUser} />
       ) : viewingProfile ? (
