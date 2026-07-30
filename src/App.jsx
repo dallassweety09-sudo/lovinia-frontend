@@ -2948,14 +2948,20 @@ function PublicLegalScreen() {
   );
 }
 
-function OnboardingScreens({ onDone }) {
-  const [step, setStep] = useState(0); // 0 = Bienvenue, 1 = Philosophie
+function OnboardingScreens({ initialStep = 0, onDone }) {
+  const [step, setStep] = useState(initialStep); // 0 = Bienvenue, 1 = Philosophie
+  const [direction, setDirection] = useState("forward"); // "forward" | "backward", pour le sens de la transition
+
+  const goTo = (next) => {
+    setDirection(next > step ? "forward" : "backward");
+    setStep(next);
+  };
 
   const dots = (
     <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 18 }}>
       {[0, 1].map((i) => (
-        <div key={i} style={{
-          width: i === step ? 22 : 7, height: 7, borderRadius: 999, transition: "width 0.25s",
+        <button key={i} onClick={() => goTo(i)} style={{
+          width: i === step ? 22 : 7, height: 7, borderRadius: 999, transition: "width 0.25s", border: "none", padding: 0, cursor: "pointer",
           background: i === step ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.18)",
         }} />
       ))}
@@ -2978,9 +2984,14 @@ function OnboardingScreens({ onDone }) {
         @keyframes onboardGlow { 0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); } 50% { opacity: 1; transform: translateX(-50%) scale(1.12); } }
         @keyframes floatIcon { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         @keyframes walkGlow { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+        @keyframes slideInFromRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInFromLeft { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
       `}</style>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "40px 26px 10px", position: "relative", zIndex: 1 }}>
+      <div key={step} style={{
+        flex: 1, overflowY: "auto", padding: "40px 26px 10px", position: "relative", zIndex: 1,
+        animation: `${direction === "forward" ? "slideInFromRight" : "slideInFromLeft"} 0.35s ease-out`,
+      }}>
         {step === 0 ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
             <div style={{ position: "relative", width: 90, height: 70, marginBottom: 14 }}>
@@ -3131,27 +3142,36 @@ function OnboardingScreens({ onDone }) {
 
       <div style={{ padding: "10px 26px 30px", position: "relative", zIndex: 1 }}>
         {dots}
-        <button
-          onClick={() => (step === 0 ? setStep(1) : onDone())}
-          style={{
-            width: "100%", padding: "15px 0", borderRadius: 999, border: "none", cursor: "pointer",
-            background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
-            color: "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 15,
-          }}
-        >
-          Suivant
-        </button>
-        {step === 0 && (
-          <button onClick={onDone} style={{ width: "100%", background: "none", border: "none", color: "#6B5A73", fontSize: 12.5, marginTop: 12, cursor: "pointer", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
-            Passer
+        <div style={{ display: "flex", gap: 10 }}>
+          {step > 0 && (
+            <button
+              onClick={() => goTo(step - 1)}
+              style={{
+                flex: 1, padding: "15px 0", borderRadius: 999, cursor: "pointer",
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.16)",
+                color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15,
+              }}
+            >
+              Retour
+            </button>
+          )}
+          <button
+            onClick={() => (step === 0 ? goTo(1) : onDone())}
+            style={{
+              flex: 2, padding: "15px 0", borderRadius: 999, border: "none", cursor: "pointer",
+              background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
+              color: "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 15,
+            }}
+          >
+            Suivant
           </button>
-        )}
+        </div>
       </div>
     </div>
   );
 }
 
-function AuthScreen({ onAuth }) {
+function AuthScreen({ onAuth, onBackToOnboarding }) {
   const [mode, setMode] = useState("register"); // "register" | "login" | "complete-google"
   const [step, setStep] = useState(0);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
@@ -3207,6 +3227,7 @@ function AuthScreen({ onAuth }) {
   const goBack = () => {
     setError("");
     if (step > 0) setStep(step - 1);
+    else if (onBackToOnboarding) onBackToOnboarding();
   };
 
   const submit = async () => {
@@ -3292,7 +3313,15 @@ function AuthScreen({ onAuth }) {
   // Mode connexion : formulaire simple, une seule étape
   if (mode === "login") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "48px 26px 30px", justifyContent: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "48px 26px 30px", justifyContent: "center", position: "relative" }}>
+        {onBackToOnboarding && (
+          <button onClick={onBackToOnboarding} style={{
+            position: "absolute", top: 16, left: 16, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)",
+            borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}>
+            <ArrowLeft size={17} color="#FBEFE9" />
+          </button>
+        )}
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <img src="/logo.png" alt="Lovinia" style={{ width: 64, height: 64, borderRadius: 16 }} />
           <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 32, color: "#FBEFE9", fontWeight: 700, margin: "10px 0 0" }}>Lovinia</p>
@@ -3471,7 +3500,7 @@ function AuthScreen({ onAuth }) {
       {error && <p style={{ color: "#FF6B5B", fontSize: 12, margin: "10px 0 0" }}>{error}</p>}
 
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        {step > 0 && (
+        {(step > 0 || onBackToOnboarding) && (
           <button onClick={goBack} style={{
             flex: 1, padding: "13px 0", borderRadius: 14, cursor: "pointer",
             background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 14,
@@ -3862,9 +3891,10 @@ function AdminScreen() {
 function MainApp() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(!!API_BASE);
-  const [onboardingDone, setOnboardingDone] = useState(() => {
-    try { return localStorage.getItem("lovinia_onboarding_seen") === "true"; } catch { return false; }
-  });
+  // L'onboarding s'affiche à CHAQUE ouverture (pas de mémorisation) : premier lancement, après
+  // déconnexion, ou retour plusieurs jours plus tard donnent tous le même parcours de présentation.
+  const [preAuthStage, setPreAuthStage] = useState("onboarding"); // "onboarding" | "auth"
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const [tab, setTab] = useState("discover");
   const [matches, setMatches] = useState([]);
   const [conversations, setConversations] = useState(CONVERSATIONS);
@@ -3966,13 +3996,10 @@ function MainApp() {
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Heart size={30} color="#FF6B5B" fill="#FF6B5B" style={{ opacity: 0.6 }} />
         </div>
-      ) : !user && !onboardingDone ? (
-        <OnboardingScreens onDone={() => {
-          try { localStorage.setItem("lovinia_onboarding_seen", "true"); } catch {}
-          setOnboardingDone(true);
-        }} />
+      ) : !user && preAuthStage === "onboarding" ? (
+        <OnboardingScreens initialStep={onboardingStep} onDone={() => setPreAuthStage("auth")} />
       ) : !user ? (
-        <AuthScreen onAuth={setUser} />
+        <AuthScreen onAuth={setUser} onBackToOnboarding={() => { setOnboardingStep(1); setPreAuthStage("onboarding"); }} />
       ) : viewingProfile ? (
         <ProfileDetailScreen match={viewingProfile} currentUserId={user?.id} onBack={() => setViewingProfile(null)} onMessage={() => openChat(viewingProfile)} />
       ) : activeChat ? (
@@ -3983,7 +4010,7 @@ function MainApp() {
             {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} />}
             {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} onViewProfile={openProfile} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
-            {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); }} />}
+            {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} />}
           </div>
           <div style={{
             display: "flex", justifyContent: "space-around", padding: "10px 8px 16px",
