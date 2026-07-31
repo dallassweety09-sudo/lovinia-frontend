@@ -88,11 +88,13 @@ async function uploadMediaToCloudinary(file) {
 
 const INTENTIONS = [
   { value: "❤️ Relation sérieuse", emoji: "❤️", label: "Relation sérieuse" },
+  { value: "💍 Mariage", emoji: "💍", label: "Mariage" },
   { value: "💕 Rencontres sans prise de tête", emoji: "💕", label: "Sans prise de tête" },
   { value: "🍷 Prendre un verre", emoji: "🍷", label: "Prendre un verre" },
-  { value: "🌙 Coup d'un soir", emoji: "🌙", label: "Coup d'un soir" },
+  { value: "🔥 En dispo ce soir", emoji: "🔥", label: "En dispo ce soir" },
   { value: "💬 Discuter et se faire des amis", emoji: "💬", label: "Discuter, amis" },
   { value: "✈️ Recherche de partenaire de voyage", emoji: "✈️", label: "Partenaire de voyage" },
+  { value: "👑 Service VIP", emoji: "👑", label: "Service VIP" },
 ];
 
 const PROFILES = [
@@ -2475,6 +2477,10 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
   const [intention, setIntention] = useState("");
   const [photos, setPhotos] = useState([]);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [extraInfo, setExtraInfo] = useState({
+    wantsMarriage: "", wantsChildren: "", educationLevel: "", hasPets: "", drinksAlcohol: "", smokes: "", doesSport: "",
+  });
   const [verificationStatus, setVerificationStatus] = useState("none");
   const [userPlan, setUserPlan] = useState("free");
   const [verifUploading, setVerifUploading] = useState(false);
@@ -2527,6 +2533,16 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setBio(data.user.bio || "Ajoute une bio pour te présenter.");
           setIntention(data.user.intention || "");
           setPhotos(data.user.photos || []);
+          setProfileCompletion(data.user.profileCompletion || 0);
+          setExtraInfo({
+            wantsMarriage: data.user.wants_marriage || "",
+            wantsChildren: data.user.wants_children || "",
+            educationLevel: data.user.education_level || "",
+            hasPets: data.user.has_pets || "",
+            drinksAlcohol: data.user.drinks_alcohol || "",
+            smokes: data.user.smokes || "",
+            doesSport: data.user.does_sport || "",
+          });
           setVerificationStatus(data.user.verification_status || "none");
           setUserPlan(data.user.plan || "free");
           setInvisible(!!data.user.invisible);
@@ -2630,11 +2646,13 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
     if (API_BASE) {
       try {
         const token = localStorage.getItem("token");
-        await fetch(`${API_BASE}/api/me`, {
+        const res = await fetch(`${API_BASE}/api/me`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name, bio, intention, photos }),
+          body: JSON.stringify({ name, bio, intention, photos, ...extraInfo }),
         });
+        const data = await res.json();
+        if (data.user) setProfileCompletion(data.user.profileCompletion || 0);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       } catch {
@@ -2673,6 +2691,25 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   return (
     <div style={{ padding: "18px 18px 0" }}>
       <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mon profil</span>
+
+      <div style={{ marginTop: 14, padding: 14, borderRadius: 16, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <p style={{ color: "#FBEFE9", fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 700, margin: 0 }}>
+            Profil complété à {profileCompletion} %
+          </p>
+        </div>
+        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+          <div style={{
+            width: `${profileCompletion}%`, height: "100%", borderRadius: 3, transition: "width 0.4s ease",
+            background: "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)",
+          }} />
+        </div>
+        {profileCompletion < 100 && (
+          <p style={{ color: "#8B7A93", fontSize: 11.5, marginTop: 8, lineHeight: 1.4 }}>
+            Ajoute plus d'informations pour recevoir davantage de matchs et inspirer plus de confiance.
+          </p>
+        )}
+      </div>
 
       {!emailVerified && (
         <div style={{ marginTop: 14, padding: 14, borderRadius: 14, background: "rgba(242,184,75,0.12)", border: "1px solid rgba(242,184,75,0.35)" }}>
@@ -2763,6 +2800,42 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           </>
         )}
       </div>
+      <div style={{ marginTop: 24 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Plus d'infos</label>
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 14 }}>
+          {[
+            { key: "wantsMarriage", emoji: "💍", label: "Veut se marier", options: ["Oui", "Non", "Peut-être"] },
+            { key: "wantsChildren", emoji: "👶", label: "Souhaite des enfants", options: ["Oui", "Non", "Peut-être"] },
+            { key: "educationLevel", emoji: "🎓", label: "Niveau d'études", options: ["Lycée", "Licence", "Master", "Doctorat", "Autre"] },
+            { key: "hasPets", emoji: "🐶", label: "Animaux", options: ["Oui", "Non", "J'adore mais je n'en ai pas"] },
+            { key: "drinksAlcohol", emoji: "🍷", label: "Alcool", options: ["Jamais", "Parfois", "Souvent"] },
+            { key: "smokes", emoji: "🚬", label: "Tabac", options: ["Jamais", "Parfois", "Souvent"] },
+            { key: "doesSport", emoji: "🏋️", label: "Sport", options: ["Jamais", "Parfois", "Régulièrement"] },
+          ].map((field) => (
+            <div key={field.key}>
+              <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6 }}>{field.emoji} {field.label}</p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {field.options.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setExtraInfo((v) => ({ ...v, [field.key]: v[field.key] === opt ? "" : opt }))}
+                    style={{
+                      padding: "7px 13px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                      background: extraInfo[field.key] === opt ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.06)",
+                      color: extraInfo[field.key] === opt ? "#2A0E12" : "#D8C4D0",
+                      border: `1px solid ${extraInfo[field.key] === opt ? "transparent" : "rgba(255,255,255,0.12)"}`,
+                      fontWeight: extraInfo[field.key] === opt ? 700 : 400,
+                    }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div style={{ marginTop: 24 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes photos</label>
         <div style={{ marginTop: 8 }}>
@@ -3566,10 +3639,11 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
   const [step, setStep] = useState(0);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const [form, setForm] = useState({
-    name: "", email: "", password: "",
+    name: "", email: "", phone: "", password: "",
     birthdate: "", genre: "", genre_recherche: "Tous", city: "", profession: "", taille: "",
     interests: [], langues: [], intention: "", photos: [], acceptedTerms: false, orientation: "",
   });
+  const [authMethod, setAuthMethod] = useState("email"); // "email" | "phone"
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [legalOpen, setLegalOpen] = useState(null); // "privacy" | "terms" | null
@@ -3592,7 +3666,7 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
   const validateStep = () => {
     if (mode === "login") return true;
     const s = steps[step];
-    if (s === "compte" && (!form.name || !form.email || !form.password)) return "Merci de remplir tous les champs.";
+    if (s === "compte" && (!form.name || !form.password || (authMethod === "email" ? !form.email : !form.phone))) return "Merci de remplir tous les champs.";
     if (s === "details" && (!form.birthdate || !form.genre || !form.city)) return "Merci de compléter tes informations.";
     if (s === "details") {
       const age = calcAgeClient(form.birthdate);
@@ -3728,7 +3802,20 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div>
+          <div style={fieldWrap}>
+            <Mail size={16} color="#8C7A94" />
+            <input
+              placeholder="Email ou numéro de téléphone"
+              value={form.email || form.phone}
+              onChange={(e) => {
+                const v = e.target.value;
+                // Détection simple : que des chiffres/+/espaces/tirets = téléphone, sinon email.
+                if (/^[0-9+\s()-]+$/.test(v) && v.length > 0) { set("phone", v); set("email", ""); }
+                else { set("email", v); set("phone", ""); }
+              }}
+              style={fieldInput}
+            />
+          </div>
         </div>
         <div style={{ marginBottom: 8 }}>
           <div style={fieldWrap}><Lock size={16} color="#8C7A94" /><input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} /></div>
@@ -3779,7 +3866,25 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
             </div>
 
             <div style={{ marginBottom: 12 }}><div style={fieldWrap}><User size={16} color="#8C7A94" /><input placeholder="Ton prénom" value={form.name} onChange={(e) => set("name", e.target.value)} style={fieldInput} /></div></div>
-            <div style={{ marginBottom: 12 }}><div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div></div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button type="button" onClick={() => setAuthMethod("email")} style={{
+                flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer", fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+                background: authMethod === "email" ? "#A78BFA" : "rgba(255,255,255,0.08)", color: "#FBEFE9",
+                border: authMethod === "email" ? "1px solid #A78BFA" : "1px solid rgba(255,255,255,0.14)",
+              }}>✉️ Email</button>
+              <button type="button" onClick={() => setAuthMethod("phone")} style={{
+                flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer", fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+                background: authMethod === "phone" ? "#A78BFA" : "rgba(255,255,255,0.08)", color: "#FBEFE9",
+                border: authMethod === "phone" ? "1px solid #A78BFA" : "1px solid rgba(255,255,255,0.14)",
+              }}>📱 Téléphone</button>
+            </div>
+
+            {authMethod === "email" ? (
+              <div style={{ marginBottom: 12 }}><div style={fieldWrap}><Mail size={16} color="#8C7A94" /><input placeholder="Adresse email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={fieldInput} /></div></div>
+            ) : (
+              <div style={{ marginBottom: 12 }}><div style={fieldWrap}><Zap size={16} color="#8C7A94" /><input placeholder="Numéro de téléphone (ex: +237 6XX XXX XXX)" type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} style={fieldInput} /></div></div>
+            )}
             <div style={{ marginBottom: 8 }}><div style={fieldWrap}><Lock size={16} color="#8C7A94" /><input placeholder="Mot de passe" type="password" value={form.password} onChange={(e) => set("password", e.target.value)} style={fieldInput} /></div></div>
           </>
         )}
