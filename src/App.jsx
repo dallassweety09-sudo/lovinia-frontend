@@ -1493,6 +1493,64 @@ function GiftPickerModal({ postId, onClose, onSent }) {
   );
 }
 
+function PrivateContentLock({ isVideo }) {
+  const [subscribing, setSubscribing] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  const unlock = async () => {
+    setSubscribing(true);
+    setError("");
+    if (!API_BASE) { setDone(true); setSubscribing(false); return; }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/subscribe`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan: "vip" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'abonnement.");
+      setDone(true);
+    } catch (e) {
+      setError(e.message || "Une erreur est survenue.");
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      background: "linear-gradient(160deg, #3A2645, #5A3450 45%, #2A1B33)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center",
+    }}>
+      <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(155,93,229,0.2)", border: "1px solid rgba(155,93,229,0.5)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+        <Lock size={24} color="#C9AEFF" />
+      </div>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15, margin: 0 }}>
+        {isVideo ? "Vidéo privée" : "Photo privée"}
+      </p>
+      <p style={{ color: "#C6B4C9", fontSize: 12, marginTop: 6, marginBottom: 18, maxWidth: 240 }}>
+        Réservé aux membres avec le Pack VIP.
+      </p>
+      {done ? (
+        <p style={{ color: "#3ECF6B", fontSize: 12.5, fontWeight: 600 }}>Pack VIP activé ✓ — referme puis rouvre la publication pour la voir.</p>
+      ) : (
+        <>
+          <button onClick={unlock} disabled={subscribing} style={{
+            padding: "11px 22px", borderRadius: 999, border: "none", cursor: subscribing ? "default" : "pointer",
+            background: "linear-gradient(120deg, #F2B84B, #FF6B5B)", color: "#2A0E12",
+            fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13,
+          }}>
+            {subscribing ? "Activation..." : "👑 Débloquer avec le Pack VIP"}
+          </button>
+          {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 10 }}>{error}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onUpdated }) {
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
   const [liked, setLiked] = useState(post.likedByMe);
@@ -1647,7 +1705,9 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
         display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
         <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", background: "#000", flexShrink: 0 }}>
-          {post.media_type === "video" ? (
+          {post.locked ? (
+            <PrivateContentLock isVideo={post.media_type === "video"} />
+          ) : post.media_type === "video" ? (
             <video src={post.media_url} controls playsInline preload="metadata" poster={getVideoThumbnail(post.media_url)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           ) : (
             <img src={post.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -1848,20 +1908,37 @@ function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
       {posts.map((p) => (
         <div key={p.id} onClick={() => onOpen(p)} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: "#2A1B33" }}>
-          {p.media_type === "video" ? (
+          {p.locked ? (
+            <div style={{
+              width: "100%", height: "100%",
+              background: "linear-gradient(160deg, #3A2645, #5A3450 45%, #2A1B33)",
+              display: "flex", alignItems: "center", justifyContent: "center", filter: "blur(0.5px)",
+            }}>
+              <Lock size={22} color="rgba(255,255,255,0.55)" />
+            </div>
+          ) : p.media_type === "video" ? (
             <img src={getVideoThumbnail(p.media_url)} alt="Publication vidéo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <img src={p.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           )}
+          {!!p.is_private && (
+            <div style={{
+              position: "absolute", top: 6, left: 6, display: "flex", alignItems: "center", gap: 3,
+              padding: "3px 7px", borderRadius: 999, fontSize: 9, fontWeight: 700, fontFamily: "Manrope, sans-serif",
+              background: "rgba(155,93,229,0.85)", color: "#FBEFE9",
+            }}>
+              <Lock size={9} /> Privé
+            </div>
+          )}
           {isOwner && p.moderation_status && p.moderation_status !== "approved" && (
             <div style={{
-              position: "absolute", top: 6, left: 6, padding: "3px 7px", borderRadius: 999, fontSize: 9.5, fontWeight: 600,
+              position: "absolute", top: 6, right: 6, padding: "3px 7px", borderRadius: 999, fontSize: 9.5, fontWeight: 600,
               background: p.moderation_status === "rejected" ? "rgba(255,107,91,0.85)" : "rgba(242,184,75,0.85)", color: "#1B1223",
             }}>
               {p.moderation_status === "rejected" ? "Refusée" : "En attente"}
             </div>
           )}
-          {p.media_type === "video" && (
+          {p.media_type === "video" && !p.locked && (
             <div style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.5)", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Play size={11} color="#FBEFE9" fill="#FBEFE9" />
             </div>
@@ -1881,14 +1958,16 @@ function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
 }
 
 // Section "Mes publications" affichée dans l'écran Profil du propriétaire du compte.
-function MyPostsSection({ currentUserId }) {
+function MyPostsSection({ currentUserId, userPlan }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(!!API_BASE);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [openPost, setOpenPost] = useState(null);
+  const [nextIsPrivate, setNextIsPrivate] = useState(false);
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
+  const canGoPrivate = userPlan === "gold" || userPlan === "vip";
 
   const load = async () => {
     if (!API_BASE) { setLoading(false); return; }
@@ -1942,7 +2021,7 @@ function MyPostsSection({ currentUserId }) {
         const res = await fetch(`${API_BASE}/api/posts`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-          body: JSON.stringify({ mediaUrl: url, mediaType }),
+          body: JSON.stringify({ mediaUrl: url, mediaType, isPrivate: canGoPrivate && nextIsPrivate }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Échec de la publication.");
@@ -1980,6 +2059,27 @@ function MyPostsSection({ currentUserId }) {
         <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
         <input ref={videoInputRef} type="file" accept="video/*" onChange={handleFile} style={{ display: "none" }} />
       </div>
+
+      {canGoPrivate ? (
+        <button onClick={() => setNextIsPrivate((v) => !v)} style={{
+          display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "8px 12px", borderRadius: 12,
+          background: nextIsPrivate ? "rgba(155,93,229,0.15)" : "rgba(255,255,255,0.05)",
+          border: `1px solid ${nextIsPrivate ? "rgba(155,93,229,0.4)" : "rgba(255,255,255,0.1)"}`, cursor: "pointer", width: "100%",
+        }}>
+          <div style={{
+            width: 34, height: 19, borderRadius: 999, background: nextIsPrivate ? "#9B5DE5" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s", flexShrink: 0,
+          }}>
+            <div style={{ width: 14, height: 14, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: nextIsPrivate ? 17 : 2.5, transition: "left 0.2s" }} />
+          </div>
+          <span style={{ color: "#FBEFE9", fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>
+            {nextIsPrivate ? "🔒 La prochaine publication sera privée" : "🌍 La prochaine publication sera publique"}
+          </span>
+        </button>
+      ) : (
+        <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
+          <Lock size={11} /> Le Pack Gold permet de publier du contenu privé (cadeaux + gains).
+        </p>
+      )}
       <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 4 }}>Photos, ou vidéos de 10 secondes maximum. Likes, commentaires et cadeaux fonctionnent sur les deux.</p>
       {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{error}</p>}
       <div style={{ marginTop: 10 }}>
@@ -2036,6 +2136,266 @@ function UserPostsSection({ userId, currentUserId }) {
           onUpdated={(id, patch) => setPosts((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)))}
         />
       )}
+    </div>
+  );
+}
+
+const SUBSCRIPTION_PLAN_LABELS = { gold: "Gold", premium: "Premium", vip: "VIP" };
+const SUBSCRIPTION_PLAN_STYLE = {
+  gold: { grad: "linear-gradient(120deg, #F2B84B, #D97706)", icon: "🥇", border: "rgba(242,184,75,0.4)" },
+  premium: { grad: "linear-gradient(120deg, #E8548A, #9B5DE5)", icon: "⭐", border: "rgba(232,84,138,0.4)" },
+  vip: { grad: "linear-gradient(120deg, #9B5DE5, #FF6B5B)", icon: "💎", border: "rgba(155,93,229,0.4)" },
+};
+
+const FALLBACK_PLANS = {
+  gold: { name: "Pack Gold", priceUSD: 5, features: ["Publier des photos et vidéos privées", "Interrupteur Public/Privé sur chaque contenu", "Gestion des contenus privés depuis le profil", "Statistiques des contenus privés", "Réception de cadeaux sur les contenus privés", "Demande de retrait des gains"] },
+  premium: { name: "Pack Premium", priceUSD: 10, features: ["Matchs illimités", "Mise en avant du profil", "Voir qui a aimé ton profil", "Filtres avancés", "Priorité dans les recherches", "Boost du profil", "Plus de Super Likes", "Badge Premium", "Réduction sur les LoviCoins", "Statistiques détaillées"] },
+  vip: { name: "Pack VIP", priceUSD: 15, features: ["Tous les avantages Premium", "Consultation des photos et vidéos privées", "Accès aux contenus réservés VIP", "Cadeaux VIP exclusifs", "Bonus mensuel de LoviCoins", "Badge VIP animé", "Visibilité maximale", "Service client prioritaire"] },
+};
+
+function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
+  const [plans, setPlans] = useState(FALLBACK_PLANS);
+  const [expanded, setExpanded] = useState(null); // clé du pack déplié ("En savoir plus")
+  const [subscribingTo, setSubscribingTo] = useState(null);
+  const [error, setError] = useState("");
+  const [successPlan, setSuccessPlan] = useState(null);
+
+  useEffect(() => {
+    if (!API_BASE) return;
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/plans`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.plans) setPlans(data.plans);
+      } catch {
+        // Silencieux : on garde le catalogue de secours.
+      }
+    })();
+  }, []);
+
+  const subscribe = async (planKey) => {
+    setSubscribingTo(planKey);
+    setError("");
+    if (!API_BASE) {
+      setSuccessPlan(planKey);
+      onSubscribed?.(planKey);
+      setSubscribingTo(null);
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/subscribe`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan: planKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'abonnement.");
+      setSuccessPlan(planKey);
+      onSubscribed?.(planKey);
+    } catch (e) {
+      setError(e.message || "Une erreur est survenue.");
+    } finally {
+      setSubscribingTo(null);
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 350, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#1B1223", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 460, maxHeight: "88vh",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 10px" }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 19, margin: 0 }}>Abonnements</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+        <p style={{ color: "#8B7A93", fontSize: 12, padding: "0 20px 14px" }}>
+          Lovinia reste gratuit : inscription, matchs, messages, appels, likes. Les packs offrent juste des avantages en plus.
+        </p>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {Object.entries(plans).map(([key, plan]) => {
+            const style = SUBSCRIPTION_PLAN_STYLE[key];
+            const isCurrent = currentPlan === key;
+            const isOpen = expanded === key;
+            return (
+              <div key={key} style={{
+                borderRadius: 20, padding: 18, background: "rgba(255,255,255,0.045)",
+                border: `1px solid ${isCurrent ? style.border : "rgba(255,255,255,0.1)"}`, backdropFilter: "blur(16px)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 16 }}>
+                    <span style={{ fontSize: 20 }}>{style.icon}</span>
+                    <span style={{ background: style.grad, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>{plan.name}</span>
+                  </span>
+                  {isCurrent && <span style={{ background: style.grad, color: "#2A0E12", fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 999, fontFamily: "Manrope, sans-serif" }}>ACTIF</span>}
+                </div>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 20, margin: "0 0 10px" }}>
+                  {plan.priceUSD} $ <span style={{ color: "#8B7A93", fontSize: 12, fontWeight: 500 }}>/ mois</span>
+                </p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
+                  {plan.features.slice(0, isOpen ? plan.features.length : 3).map((f) => (
+                    <p key={f} style={{ color: "#C6B4C9", fontSize: 12, margin: 0, display: "flex", alignItems: "flex-start", gap: 6 }}>
+                      <Check size={13} color="#3ECF6B" style={{ flexShrink: 0, marginTop: 2 }} /> {f}
+                    </p>
+                  ))}
+                </div>
+                <button onClick={() => setExpanded(isOpen ? null : key)} style={{ background: "none", border: "none", color: "#A78BFA", fontSize: 11.5, cursor: "pointer", padding: 0, marginBottom: 14, fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
+                  {isOpen ? "Voir moins" : "En savoir plus"}
+                </button>
+
+                <button
+                  onClick={() => subscribe(key)}
+                  disabled={isCurrent || subscribingTo === key}
+                  style={{
+                    width: "100%", padding: "12px 0", borderRadius: 999, border: "none",
+                    cursor: isCurrent ? "default" : "pointer", background: isCurrent ? "rgba(255,255,255,0.08)" : style.grad,
+                    color: isCurrent ? "#8B7A93" : "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13.5,
+                  }}
+                >
+                  {isCurrent ? "Pack actif" : subscribingTo === key ? "Activation..." : "S'abonner"}
+                </button>
+                {successPlan === key && <p style={{ color: "#3ECF6B", fontSize: 11.5, marginTop: 8, textAlign: "center" }}>Pack {plan.name} activé ✓</p>}
+              </div>
+            );
+          })}
+        </div>
+        {error && <p style={{ color: "#FF6B5B", fontSize: 12, padding: "0 20px 16px", textAlign: "center" }}>{error}</p>}
+        <p style={{ color: "#6B5A73", fontSize: 10.5, padding: "0 20px 20px", textAlign: "center" }}>
+          Paiement de démonstration pour l'instant — le vrai paiement (carte, Mobile Money) sera bientôt disponible.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CreatorDashboardModal({ onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(!!API_BASE);
+  const [error, setError] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState("");
+
+  const load = async () => {
+    if (!API_BASE) { setLoading(false); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/me/creator-dashboard`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      setData(await res.json());
+    } catch {
+      setError("Impossible de charger ton tableau de bord.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const requestWithdraw = async () => {
+    const amount = Math.floor(Number(withdrawAmount));
+    if (!amount || amount <= 0) { setWithdrawMsg("Montant invalide."); return; }
+    setWithdrawing(true);
+    setWithdrawMsg("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/me/withdraw`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Échec de la demande.");
+      setWithdrawMsg("Demande de retrait envoyée ✓");
+      setWithdrawAmount("");
+      load();
+    } catch (e) {
+      setWithdrawMsg(e.message || "Erreur.");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 350, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#1B1223", borderRadius: 20, width: "100%", maxWidth: 440, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 17, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Gem size={18} color="#A78BFA" /> Tableau de bord créateur
+          </p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: 18 }}>
+          {loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
+          {error && (
+            <div>
+              <p style={{ color: "#FF6B5B", fontSize: 12, marginBottom: 8 }}>{error}</p>
+              <button onClick={load} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9", borderRadius: 10, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>Réessayer</button>
+            </div>
+          )}
+          {data && (
+            <>
+              <div style={{ background: "rgba(155,93,229,0.1)", border: "1px solid rgba(155,93,229,0.3)", borderRadius: 18, padding: 18, textAlign: "center", marginBottom: 16 }}>
+                <p style={{ color: "#A78BFA", fontSize: 11, fontFamily: "Manrope, sans-serif", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>Solde disponible</p>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 30, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <Coins size={24} color="#F2B84B" /> {data.balance}
+                </p>
+                <p style={{ color: "#8B7A93", fontSize: 11, marginTop: 4 }}>{data.totalGiftsReceived} cadeaux reçus sur contenu privé</p>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                <input
+                  type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder={`Montant (max ${data.balance})`}
+                  style={{ flex: 1, padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9", fontSize: 13 }}
+                />
+                <button onClick={requestWithdraw} disabled={withdrawing || data.balance === 0} style={{
+                  padding: "10px 16px", borderRadius: 12, border: "none", cursor: "pointer",
+                  background: "linear-gradient(120deg, #9B5DE5, #FF6B5B)", color: "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 12.5,
+                }}>
+                  {withdrawing ? "..." : "Demander un retrait"}
+                </button>
+              </div>
+              {withdrawMsg && <p style={{ color: withdrawMsg.includes("✓") ? "#3ECF6B" : "#FF6B5B", fontSize: 12, marginTop: -12, marginBottom: 16 }}>{withdrawMsg}</p>}
+
+              <p style={{ color: "#8B7A93", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Mes contenus privés</p>
+              {data.posts.length === 0 && <p style={{ color: "#6B5A73", fontSize: 12 }}>Aucun contenu privé publié pour l'instant.</p>}
+              {data.posts.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <img src={p.media_type === "video" ? getVideoThumbnail(p.media_url) : p.media_url} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ color: "#FBEFE9", fontSize: 11, margin: 0, display: "flex", gap: 10 }}>
+                      <span><Gift size={11} style={{ verticalAlign: -2 }} /> {p.giftCount}</span>
+                      <span><Eye size={11} style={{ verticalAlign: -2 }} /> {p.viewCount}</span>
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {data.withdrawals.length > 0 && (
+                <>
+                  <p style={{ color: "#8B7A93", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", margin: "18px 0 10px" }}>Historique des retraits</p>
+                  {data.withdrawals.map((w) => (
+                    <div key={w.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 12 }}>
+                      <span style={{ color: "#C6B4C9" }}>{formatMessageTime(w.created_at)}</span>
+                      <span style={{ color: "#FBEFE9" }}>{w.amount_coins} Coins</span>
+                      <span style={{ color: w.status === "paid" ? "#3ECF6B" : w.status === "rejected" ? "#FF6B5B" : "#F2B84B" }}>
+                        {w.status === "paid" ? "Payé" : w.status === "rejected" ? "Refusé" : "En attente"}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2116,6 +2476,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [intention, setIntention] = useState("");
   const [photos, setPhotos] = useState([]);
   const [verificationStatus, setVerificationStatus] = useState("none");
+  const [userPlan, setUserPlan] = useState("free");
   const [verifUploading, setVerifUploading] = useState(false);
   const [verifError, setVerifError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -2134,6 +2495,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [legalOpen, setLegalOpen] = useState(null);
   const [showMyPosts, setShowMyPosts] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
+  const [showSubscriptions, setShowSubscriptions] = useState(false);
+  const [showCreatorDashboard, setShowCreatorDashboard] = useState(false);
   const [acceptGifts, setAcceptGifts] = useState(true);
   const [giftSendersRestriction, setGiftSendersRestriction] = useState("everyone");
   const [hideGiftCount, setHideGiftCount] = useState(false);
@@ -2165,6 +2528,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setIntention(data.user.intention || "");
           setPhotos(data.user.photos || []);
           setVerificationStatus(data.user.verification_status || "none");
+          setUserPlan(data.user.plan || "free");
           setInvisible(!!data.user.invisible);
           setEmailVerified(data.user.email_verified !== 0 && data.user.email_verified !== false);
           setAcceptGifts(data.user.accept_gifts !== 0 && data.user.accept_gifts !== false);
@@ -2472,7 +2836,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Video size={16} color="#8C7A94" /> Mes publications</span>
         <ChevronRight size={16} color="#8C7A94" style={{ transform: showMyPosts ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
       </button>
-      {showMyPosts && <MyPostsSection currentUserId={user?.id} />}
+      {showMyPosts && <MyPostsSection currentUserId={user?.id} userPlan={userPlan} />}
 
       <button onClick={() => setShowWallet(true)} style={{
         marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
@@ -2482,6 +2846,30 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Wallet size={16} color="#F2B84B" /> Mon portefeuille (Coins)</span>
         <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
       </button>
+
+      <button onClick={() => setShowSubscriptions(true)} style={{
+        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: userPlan !== "free" ? "rgba(155,93,229,0.12)" : "rgba(255,255,255,0.06)",
+        border: userPlan !== "free" ? "1px solid rgba(155,93,229,0.4)" : "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Crown size={16} color="#F2B84B" /> Abonnements
+          {userPlan !== "free" && <span style={{ color: "#C9AEFF", fontSize: 11, fontWeight: 700 }}>· {SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan}</span>}
+        </span>
+        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+      </button>
+
+      {(userPlan === "gold" || userPlan === "vip") && (
+        <button onClick={() => setShowCreatorDashboard(true)} style={{
+          marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+          color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Gem size={16} color="#A78BFA" /> Tableau de bord créateur</span>
+          <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+        </button>
+      )}
 
       <div style={{ marginTop: 12, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -2548,6 +2936,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 
       {showVisitors && <VisitorsModal onClose={() => setShowVisitors(false)} />}
       {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
+      {showSubscriptions && <SubscriptionsModal currentPlan={userPlan} onClose={() => setShowSubscriptions(false)} onSubscribed={(p) => setUserPlan(p)} />}
+      {showCreatorDashboard && <CreatorDashboardModal onClose={() => setShowCreatorDashboard(false)} />}
 
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <p style={{ color: "#D8C4D0", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
@@ -3178,7 +3568,7 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
   const [form, setForm] = useState({
     name: "", email: "", password: "",
     birthdate: "", genre: "", genre_recherche: "Tous", city: "", profession: "", taille: "",
-    interests: [], langues: [], intention: "", photos: [], acceptedTerms: false,
+    interests: [], langues: [], intention: "", photos: [], acceptedTerms: false, orientation: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3449,13 +3839,24 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
         {stepName === "intention" && (
           <>
             <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Tu recherches...</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
               {INTENTIONS.map((it) => (
                 <button key={it.value} type="button" onClick={() => set("intention", it.value)} style={{
                   padding: "9px 13px", borderRadius: 12, cursor: "pointer", fontSize: 13,
                   background: form.intention === it.value ? "#FF6B5B" : "rgba(255,255,255,0.08)",
                   color: "#FBEFE9", border: form.intention === it.value ? "1px solid #FF6B5B" : "1px solid rgba(255,255,255,0.14)",
                 }}>{it.emoji} {it.label}</button>
+              ))}
+            </div>
+
+            <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Ton orientation <span style={{ color: "#6B5A73", fontWeight: 400, fontSize: 12 }}>(optionnel)</span></p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {["Hétérosexuel(le)", "Gay", "Lesbienne", "Bisexuel(le)"].map((o) => (
+                <button key={o} type="button" onClick={() => set("orientation", form.orientation === o ? "" : o)} style={{
+                  padding: "9px 13px", borderRadius: 12, cursor: "pointer", fontSize: 13,
+                  background: form.orientation === o ? "#A78BFA" : "rgba(255,255,255,0.08)",
+                  color: "#FBEFE9", border: form.orientation === o ? "1px solid #A78BFA" : "1px solid rgba(255,255,255,0.14)",
+                }}>{o}</button>
               ))}
             </div>
           </>
