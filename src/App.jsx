@@ -2616,6 +2616,28 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
     setInvisibleSaving(false);
   };
 
+  const [extraInfoSaving, setExtraInfoSaving] = useState(null); // clé du champ en cours de sauvegarde
+
+  const updateExtraInfo = async (key, value) => {
+    setExtraInfo((v) => ({ ...v, [key]: value }));
+    setExtraInfoSaving(key);
+    if (API_BASE) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/me`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ [key]: value }),
+        });
+        const data = await res.json();
+        if (data.user && typeof data.user.profileCompletion === "number") setProfileCompletion(data.user.profileCompletion);
+      } catch {
+        // Erreur passagère : la valeur reste affichée, l'utilisateur peut simplement re-cliquer pour réessayer.
+      }
+    }
+    setExtraInfoSaving(null);
+  };
+
   const submitSelfie = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2800,9 +2822,10 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           </>
         )}
       </div>
-      <div style={{ marginTop: 24 }}>
-        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Plus d'infos</label>
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ marginTop: 24, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: 16 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Compléter mon profil</label>
+        <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 4, marginBottom: 14 }}>Chaque réponse s'enregistre immédiatement, et compte dans ton pourcentage de complétion ci-dessus.</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {[
             { key: "wantsMarriage", emoji: "💍", label: "Veut se marier", options: ["Oui", "Non", "Peut-être"] },
             { key: "wantsChildren", emoji: "👶", label: "Souhaite des enfants", options: ["Oui", "Non", "Peut-être"] },
@@ -2813,12 +2836,16 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
             { key: "doesSport", emoji: "🏋️", label: "Sport", options: ["Jamais", "Parfois", "Régulièrement"] },
           ].map((field) => (
             <div key={field.key}>
-              <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6 }}>{field.emoji} {field.label}</p>
+              <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                {field.emoji} {field.label}
+                {extraInfo[field.key] && <Check size={13} color="#3ECF6B" />}
+                {extraInfoSaving === field.key && <span style={{ color: "#8C7A94", fontSize: 10.5 }}>Enregistrement...</span>}
+              </p>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {field.options.map((opt) => (
                   <button
                     key={opt}
-                    onClick={() => setExtraInfo((v) => ({ ...v, [field.key]: v[field.key] === opt ? "" : opt }))}
+                    onClick={() => updateExtraInfo(field.key, opt)}
                     style={{
                       padding: "7px 13px", borderRadius: 999, fontSize: 12, cursor: "pointer",
                       background: extraInfo[field.key] === opt ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.06)",
