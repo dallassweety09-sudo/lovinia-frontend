@@ -569,6 +569,7 @@ function DiscoverScreen({ onNewMatch }) {
   const [coins, setCoins] = useState(null);
   const [lastSwiped, setLastSwiped] = useState(null);
   const [toast, setToast] = useState("");
+  const [preferencesProfile, setPreferencesProfile] = useState(null);
 
   const loadLimits = useCallback(async () => {
     if (!API_BASE) return;
@@ -1111,8 +1112,10 @@ function PreferencesSection({ profile }) {
 
 function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
   const [profile, setProfile] = useState(null);
+  const [compatibility, setCompatibility] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE && !!match.matchId);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [tab, setTab] = useState("profil"); // "profil" | "galerie" | "apropos" | "compat" | "verif"
 
   useEffect(() => {
     if (!API_BASE || !match.matchId) return;
@@ -1125,6 +1128,7 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Profil introuvable.");
         setProfile(data.profile);
+        setCompatibility(data.compatibility || null);
       } catch {
         setProfile(null);
       } finally {
@@ -1137,6 +1141,14 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
   const p = profile || match;
   const photos = (p.photos && p.photos.length) ? p.photos : (p.img ? [p.img] : []);
   const currentPhoto = photos[Math.min(photoIndex, Math.max(photos.length - 1, 0))] || p.img;
+
+  const TABS = [
+    { key: "profil", label: "Profil", icon: <User size={14} /> },
+    { key: "galerie", label: "Galerie", icon: <Grid size={14} /> },
+    { key: "apropos", label: "À propos", icon: <User size={14} /> },
+    { key: "compat", label: "Compatibilité", icon: <Heart size={14} /> },
+    { key: "verif", label: "Vérification", icon: <ShieldOff size={14} /> },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
@@ -1189,57 +1201,162 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
         </div>
       </div>
 
-      <div style={{ padding: "18px 20px 28px" }}>
+      {/* Barre d'onglets */}
+      <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "12px 14px 0", flexShrink: 0 }}>
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{
+            display: "flex", alignItems: "center", gap: 5, padding: "8px 13px", borderRadius: 999, cursor: "pointer",
+            whiteSpace: "nowrap", flexShrink: 0, fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+            background: tab === t.key ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+            color: tab === t.key ? "#2A0E12" : "#D8C4D0",
+            border: tab === t.key ? "none" : "1px solid rgba(255,255,255,0.1)",
+          }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "16px 20px 28px" }}>
         {loading && <p style={{ color: "#B39FBF", fontSize: 13.5, textAlign: "center" }}>Chargement du profil...</p>}
 
-        {p.intention && (
-          <div style={{
-            display: "inline-block", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: 999, padding: "6px 14px", color: "#FBEFE9", fontSize: 12.5, fontWeight: 600, marginBottom: 14,
-          }}>{p.intention}</div>
+        {tab === "profil" && (
+          <>
+            {p.intention && (
+              <div style={{
+                display: "inline-block", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 999, padding: "6px 14px", color: "#FBEFE9", fontSize: 12.5, fontWeight: 600, marginBottom: 14,
+              }}>{p.intention}</div>
+            )}
+            {p.bio && (
+              <p style={{ color: "#F0E3EC", fontSize: 14.5, lineHeight: 1.6, marginBottom: 16 }}>{p.bio}</p>
+            )}
+            {(p.interests?.length ? p.interests : []).length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Centres d'intérêt</p>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {p.interests.map((t2) => (
+                    <span key={t2} style={{
+                      fontSize: 12.5, padding: "6px 12px", borderRadius: 999,
+                      background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+                    }}>{t2}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={onMessage} style={{
+              width: "100%", padding: "14px 0", borderRadius: 999, cursor: "pointer",
+              background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)", color: "#2A0E12", border: "none", fontSize: 15, fontWeight: 800, fontFamily: "Manrope, sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              <MessageCircle size={18} /> Envoyer un message
+            </button>
+          </>
         )}
 
-        {p.bio && (
-          <p style={{ color: "#F0E3EC", fontSize: 14.5, lineHeight: 1.6, marginBottom: 16 }}>{p.bio}</p>
-        )}
+        {tab === "galerie" && <UserPostsSection userId={p.id} currentUserId={currentUserId} />}
 
-        {p.taille ? (
-          <p style={{ color: "#B39FBF", fontSize: 13, marginBottom: 12 }}>Taille : {p.taille} cm</p>
-        ) : null}
-
-        {(p.interests?.length ? p.interests : p.tags || []).length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Centres d'intérêt</p>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {(p.interests?.length ? p.interests : p.tags || []).map((t) => (
-                <span key={t} style={{
-                  fontSize: 12.5, padding: "6px 12px", borderRadius: 999,
-                  background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
-                }}>{t}</span>
-              ))}
+        {tab === "apropos" && (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              {p.profession && <InfoRow icon={<Settings size={15} color="#A78BFA" />} label="Profession" value={p.profession} />}
+              {p.education_level && <InfoRow icon={<Sparkles size={15} color="#A78BFA" />} label="Études" value={p.education_level} />}
+              {p.taille && <InfoRow icon={<User size={15} color="#A78BFA" />} label="Taille" value={`${p.taille} cm`} />}
+              {p.langues?.length > 0 && <InfoRow icon={<Mail size={15} color="#A78BFA" />} label="Langues" value={p.langues.join(", ")} />}
             </div>
-          </div>
+            <PreferencesSection profile={p} />
+          </>
         )}
 
-        {p.langues?.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Langues parlées</p>
-            <p style={{ color: "#D8C4D0", fontSize: 13.5 }}>{p.langues.join(", ")}</p>
-          </div>
+        {tab === "compat" && (
+          <CompatibilityTab compatibility={compatibility} name={p.name} />
         )}
 
-        <PreferencesSection profile={p} />
-
-        <UserPostsSection userId={p.id} currentUserId={currentUserId} />
-
-        <button onClick={onMessage} style={{
-          width: "100%", padding: "14px 0", borderRadius: 999, cursor: "pointer",
-          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)", color: "#2A0E12", border: "none", fontSize: 15, fontWeight: 800, fontFamily: "Manrope, sans-serif",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}>
-          <MessageCircle size={18} /> Envoyer un message
-        </button>
+        {tab === "verif" && (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: "50%", margin: "0 auto 16px",
+              background: p.verification_status === "verified" ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.06)",
+              border: `1px solid ${p.verification_status === "verified" ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.14)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {p.verification_status === "verified" ? <BadgeCheck size={34} color="#A78BFA" /> : <ShieldOff size={30} color="#8C7A94" />}
+            </div>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
+              {p.verification_status === "verified" ? "Profil vérifié" : "Profil non vérifié"}
+            </p>
+            <p style={{ color: "#8C7A94", fontSize: 12.5, maxWidth: 260, margin: "0 auto" }}>
+              {p.verification_status === "verified"
+                ? "Cette personne a confirmé son identité par selfie. Badge accordé après vérification manuelle."
+                : "Cette personne n'a pas encore complété la vérification par selfie."}
+            </p>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
+      <div>
+        <p style={{ color: "#8C7A94", fontSize: 10.5, margin: 0, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</p>
+        <p style={{ color: "#FBEFE9", fontSize: 13.5, margin: "1px 0 0" }}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function CompatibilityTab({ compatibility, name }) {
+  if (!compatibility) {
+    return <p style={{ color: "#8C7A94", fontSize: 12.5, textAlign: "center", padding: "30px 0" }}>Le score de compatibilité sera disponible une fois connecté.</p>;
+  }
+  const { score, sharedInterests, sharedLangues, sameIntention, sameAgeRange, sameMarriageGoal, sameChildrenGoal } = compatibility;
+  const shared = [
+    sharedInterests.length > 0 && `${sharedInterests.length} centre${sharedInterests.length > 1 ? "s" : ""} d'intérêt commun${sharedInterests.length > 1 ? "s" : ""}`,
+    sameIntention && "Même projet de rencontre",
+    sharedLangues.length > 0 && "Langue en commun",
+    sameAgeRange && "Tranche d'âge proche",
+    sameMarriageGoal && "Même vision du mariage",
+    sameChildrenGoal && "Même vision des enfants",
+  ].filter(Boolean);
+
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ position: "relative", width: 150, height: 150, margin: "10px auto 18px" }}>
+        <svg width="150" height="150" viewBox="0 0 150 150" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="75" cy="75" r="66" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+          <circle
+            cx="75" cy="75" r="66" fill="none" stroke="url(#compatGrad)" strokeWidth="10" strokeLinecap="round"
+            strokeDasharray={2 * Math.PI * 66} strokeDashoffset={2 * Math.PI * 66 * (1 - score / 100)}
+          />
+          <defs>
+            <linearGradient id="compatGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FF6B5B" /><stop offset="55%" stopColor="#E8548A" /><stop offset="100%" stopColor="#9B5DE5" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <Heart size={22} color="#E8548A" fill="#E8548A" />
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 28, margin: "2px 0 0" }}>{score}%</p>
+        </div>
+      </div>
+      <p style={{ color: "#C9AEFF", fontSize: 13, fontWeight: 700, fontFamily: "Manrope, sans-serif", marginBottom: 20 }}>
+        {score >= 85 ? "Excellente compatibilité" : score >= 65 ? "Bonne compatibilité" : "Compatibilité modérée"}
+      </p>
+      {shared.length > 0 ? (
+        <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 9 }}>
+          <p style={{ color: "#8C7A94", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>Vous partagez</p>
+          {shared.map((s) => (
+            <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Check size={15} color="#3ECF6B" /> <span style={{ color: "#F0E3EC", fontSize: 13 }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Complétez votre profil pour affiner ce score avec {name}.</p>
+      )}
     </div>
   );
 }
