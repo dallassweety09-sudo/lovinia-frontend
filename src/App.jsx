@@ -268,7 +268,7 @@ const menuBtnStyle = {
   background: "none", border: "none", color: "#FBEFE9", fontSize: 14, cursor: "pointer", textAlign: "left",
 };
 
-function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
+function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferences }) {
   const cardRef = useRef(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const start = useRef({ x: 0, y: 0 });
@@ -382,6 +382,15 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
             }}>{t}</span>
           ))}
         </div>
+        {isTop && PREFERENCE_DISPLAY_FIELDS.some((f) => profile?.[f.key]) && (
+          <button onClick={() => onShowPreferences?.(profile)} style={{
+            marginTop: 12, display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "6px 13px", color: "#FBEFE9",
+            fontSize: 12, cursor: "pointer",
+          }}>
+            <Eye size={13} /> Voir les préférences
+          </button>
+        )}
       </div>
 
       <div style={{
@@ -801,8 +810,26 @@ function DiscoverScreen({ onNewMatch }) {
             zIndex={i}
             onSwipe={swipe}
             onBlocked={(id) => setDeck((d) => d.filter((x) => x.id !== id))}
+            onShowPreferences={setPreferencesProfile}
           />
         ))}
+        {preferencesProfile && (
+          <div onClick={() => setPreferencesProfile(null)} style={{
+            position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 60,
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+          }}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: "#1B1223", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 460, maxHeight: "70vh",
+              overflowY: "auto", padding: "18px 20px 28px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 17, margin: 0 }}>{preferencesProfile.name}</p>
+                <button onClick={() => setPreferencesProfile(null)} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+              </div>
+              <PreferencesSection profile={preferencesProfile} />
+            </div>
+          </div>
+        )}
         {spark && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -1048,6 +1075,40 @@ function MessagesScreen({ conversations, onOpenChat }) {
   );
 }
 
+const PREFERENCE_DISPLAY_FIELDS = [
+  { key: "wants_marriage", emoji: "💍", label: "Veut se marier" },
+  { key: "wants_children", emoji: "👶", label: "Souhaite des enfants" },
+  { key: "education_level", emoji: "🎓", label: "Niveau d'études" },
+  { key: "has_pets", emoji: "🐶", label: "Animaux" },
+  { key: "drinks_alcohol", emoji: "🍷", label: "Alcool" },
+  { key: "smokes", emoji: "🚬", label: "Tabac" },
+  { key: "does_sport", emoji: "🏋️", label: "Sport" },
+];
+
+// Affiche les préférences de compatibilité (mariage, enfants, études...) d'un profil consulté,
+// avant de matcher — uniquement les champs que la personne a bien renseignés.
+function PreferencesSection({ profile }) {
+  const filled = PREFERENCE_DISPLAY_FIELDS.filter((f) => profile?.[f.key]);
+  if (filled.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Préférences</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {filled.map((f) => (
+          <div key={f.key} style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 12, padding: "9px 12px",
+          }}>
+            <span style={{ color: "#D8C4D0", fontSize: 12.5 }}>{f.emoji} {f.label}</span>
+            <span style={{ color: "#FBEFE9", fontSize: 12.5, fontWeight: 600 }}>{profile[f.key]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(!!API_BASE && !!match.matchId);
@@ -1166,6 +1227,8 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
             <p style={{ color: "#D8C4D0", fontSize: 13.5 }}>{p.langues.join(", ")}</p>
           </div>
         )}
+
+        <PreferencesSection profile={p} />
 
         <UserPostsSection userId={p.id} currentUserId={currentUserId} />
 
@@ -2402,6 +2465,64 @@ function CreatorDashboardModal({ onClose }) {
   );
 }
 
+const EXTRA_INFO_FIELDS = [
+  { key: "wantsMarriage", emoji: "💍", label: "Veut se marier", options: ["Oui", "Non", "Peut-être"] },
+  { key: "wantsChildren", emoji: "👶", label: "Souhaite des enfants", options: ["Oui", "Non", "Peut-être"] },
+  { key: "educationLevel", emoji: "🎓", label: "Niveau d'études", options: ["Lycée", "Licence", "Master", "Doctorat", "Autre"] },
+  { key: "hasPets", emoji: "🐶", label: "Animaux", options: ["Oui", "Non", "J'adore mais je n'en ai pas"] },
+  { key: "drinksAlcohol", emoji: "🍷", label: "Alcool", options: ["Jamais", "Parfois", "Souvent"] },
+  { key: "smokes", emoji: "🚬", label: "Tabac", options: ["Jamais", "Parfois", "Souvent"] },
+  { key: "doesSport", emoji: "🏋️", label: "Sport", options: ["Jamais", "Parfois", "Régulièrement"] },
+];
+
+function ProfileSettingsModal({ extraInfo, extraInfoSaving, updateExtraInfo, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 340, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#1B1223", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 460, maxHeight: "88vh",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 6px" }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 18, margin: 0 }}>Paramètres du profil</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+        <p style={{ color: "#6B5A73", fontSize: 11.5, padding: "0 20px 14px" }}>
+          Chaque réponse s'enregistre immédiatement. Ces informations n'apparaissent pas sur ton profil principal, mais
+          sont visibles par les autres dans leur fiche "Préférences" avant un match.
+        </p>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 26px", display: "flex", flexDirection: "column", gap: 16 }}>
+          {EXTRA_INFO_FIELDS.map((field) => (
+            <div key={field.key}>
+              <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                {field.emoji} {field.label}
+                {extraInfo[field.key] && <Check size={13} color="#3ECF6B" />}
+                {extraInfoSaving === field.key && <span style={{ color: "#8C7A94", fontSize: 10.5 }}>Enregistrement...</span>}
+              </p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {field.options.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => updateExtraInfo(field.key, opt)}
+                    style={{
+                      padding: "7px 13px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                      background: extraInfo[field.key] === opt ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.06)",
+                      color: extraInfo[field.key] === opt ? "#2A0E12" : "#D8C4D0",
+                      border: `1px solid ${extraInfo[field.key] === opt ? "transparent" : "rgba(255,255,255,0.12)"}`,
+                      fontWeight: extraInfo[field.key] === opt ? 700 : 400,
+                    }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WalletModal({ onClose }) {
   const [coins, setCoins] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -2475,6 +2596,9 @@ function WalletModal({ onClose }) {
 function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [name, setName] = useState(user?.name || "Toi");
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
+  const [profession, setProfession] = useState("");
+  const [taille, setTaille] = useState("");
+  const [interests, setInterests] = useState([]);
   const [intention, setIntention] = useState("");
   const [photos, setPhotos] = useState([]);
   const [profileCompletion, setProfileCompletion] = useState(0);
@@ -2501,6 +2625,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [legalOpen, setLegalOpen] = useState(null);
   const [showMyPosts, setShowMyPosts] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [showCreatorDashboard, setShowCreatorDashboard] = useState(false);
   const [acceptGifts, setAcceptGifts] = useState(true);
@@ -2531,6 +2656,9 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         if (data.user) {
           setName(data.user.name || "");
           setBio(data.user.bio || "Ajoute une bio pour te présenter.");
+          setProfession(data.user.profession || "");
+          setTaille(data.user.taille || "");
+          setInterests(Array.isArray(data.user.interests) ? data.user.interests : []);
           setIntention(data.user.intention || "");
           setPhotos(data.user.photos || []);
           setProfileCompletion(data.user.profileCompletion || 0);
@@ -2822,46 +2950,17 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           </>
         )}
       </div>
-      <div style={{ marginTop: 24, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: 16 }}>
-        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Compléter mon profil</label>
-        <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 4, marginBottom: 14 }}>Chaque réponse s'enregistre immédiatement, et compte dans ton pourcentage de complétion ci-dessus.</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {[
-            { key: "wantsMarriage", emoji: "💍", label: "Veut se marier", options: ["Oui", "Non", "Peut-être"] },
-            { key: "wantsChildren", emoji: "👶", label: "Souhaite des enfants", options: ["Oui", "Non", "Peut-être"] },
-            { key: "educationLevel", emoji: "🎓", label: "Niveau d'études", options: ["Lycée", "Licence", "Master", "Doctorat", "Autre"] },
-            { key: "hasPets", emoji: "🐶", label: "Animaux", options: ["Oui", "Non", "J'adore mais je n'en ai pas"] },
-            { key: "drinksAlcohol", emoji: "🍷", label: "Alcool", options: ["Jamais", "Parfois", "Souvent"] },
-            { key: "smokes", emoji: "🚬", label: "Tabac", options: ["Jamais", "Parfois", "Souvent"] },
-            { key: "doesSport", emoji: "🏋️", label: "Sport", options: ["Jamais", "Parfois", "Régulièrement"] },
-          ].map((field) => (
-            <div key={field.key}>
-              <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                {field.emoji} {field.label}
-                {extraInfo[field.key] && <Check size={13} color="#3ECF6B" />}
-                {extraInfoSaving === field.key && <span style={{ color: "#8C7A94", fontSize: 10.5 }}>Enregistrement...</span>}
-              </p>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {field.options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => updateExtraInfo(field.key, opt)}
-                    style={{
-                      padding: "7px 13px", borderRadius: 999, fontSize: 12, cursor: "pointer",
-                      background: extraInfo[field.key] === opt ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.06)",
-                      color: extraInfo[field.key] === opt ? "#2A0E12" : "#D8C4D0",
-                      border: `1px solid ${extraInfo[field.key] === opt ? "transparent" : "rgba(255,255,255,0.12)"}`,
-                      fontWeight: extraInfo[field.key] === opt ? 700 : 400,
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <button onClick={() => setShowProfileSettings(true)} style={{
+        marginTop: 20, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Settings size={16} color="#A78BFA" /> Paramètres du profil</span>
+        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
+      </button>
+      {showProfileSettings && (
+        <ProfileSettingsModal extraInfo={extraInfo} extraInfoSaving={extraInfoSaving} updateExtraInfo={updateExtraInfo} onClose={() => setShowProfileSettings(false)} />
+      )}
 
       <div style={{ marginTop: 24 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes photos</label>
