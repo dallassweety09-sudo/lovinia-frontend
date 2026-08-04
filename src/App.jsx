@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check } from "lucide-react";
 
-
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
 const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
@@ -1085,6 +1084,8 @@ const PREFERENCE_DISPLAY_FIELDS = [
   { key: "drinks_alcohol", emoji: "🍷", label: "Alcool" },
   { key: "smokes", emoji: "🚬", label: "Tabac" },
   { key: "does_sport", emoji: "🏋️", label: "Sport" },
+  { key: "religion", emoji: "🙏", label: "Religion" },
+  { key: "astro_sign", emoji: "✨", label: "Signe astrologique" },
 ];
 
 // Affiche les préférences de compatibilité (mariage, enfants, études...) d'un profil consulté,
@@ -1147,8 +1148,7 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
     { key: "profil", label: "Profil", icon: <User size={14} /> },
     { key: "galerie", label: "Galerie", icon: <Grid size={14} /> },
     { key: "apropos", label: "À propos", icon: <User size={14} /> },
-    { key: "compat", label: "Compatibilité", icon: <Heart size={14} /> },
-    { key: "verif", label: "Vérification", icon: <ShieldOff size={14} /> },
+    { key: "compat", label: "Vérif. & Compatibilité", icon: <Heart size={14} /> },
   ];
 
   return (
@@ -1269,28 +1269,30 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
         )}
 
         {tab === "compat" && (
-          <CompatibilityTab compatibility={compatibility} name={p.name} />
-        )}
-
-        {tab === "verif" && (
-          <div style={{ textAlign: "center", padding: "20px 0" }}>
+          <>
             <div style={{
-              width: 76, height: 76, borderRadius: "50%", margin: "0 auto 16px",
-              background: p.verification_status === "verified" ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.06)",
-              border: `1px solid ${p.verification_status === "verified" ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.14)"}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
+              display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16, marginBottom: 22,
+              background: p.verification_status === "verified" ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${p.verification_status === "verified" ? "rgba(167,139,250,0.35)" : "rgba(255,255,255,0.1)"}`,
             }}>
-              {p.verification_status === "verified" ? <BadgeCheck size={34} color="#A78BFA" /> : <ShieldOff size={30} color="#8C7A94" />}
+              <div style={{
+                width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+                background: p.verification_status === "verified" ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.06)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {p.verification_status === "verified" ? <BadgeCheck size={22} color="#A78BFA" /> : <ShieldOff size={19} color="#8C7A94" />}
+              </div>
+              <div>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 13.5, margin: 0 }}>
+                  {p.verification_status === "verified" ? "Profil vérifié" : "Profil non vérifié"}
+                </p>
+                <p style={{ color: "#8C7A94", fontSize: 11, margin: "2px 0 0" }}>
+                  {p.verification_status === "verified" ? "Identité confirmée par selfie" : "Vérification par selfie non complétée"}
+                </p>
+              </div>
             </div>
-            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
-              {p.verification_status === "verified" ? "Profil vérifié" : "Profil non vérifié"}
-            </p>
-            <p style={{ color: "#8C7A94", fontSize: 12.5, maxWidth: 260, margin: "0 auto" }}>
-              {p.verification_status === "verified"
-                ? "Cette personne a confirmé son identité par selfie. Badge accordé après vérification manuelle."
-                : "Cette personne n'a pas encore complété la vérification par selfie."}
-            </p>
-          </div>
+            <CompatibilityTab compatibility={compatibility} name={p.name} />
+          </>
         )}
       </div>
     </div>
@@ -2591,6 +2593,8 @@ const EXTRA_INFO_FIELDS = [
   { key: "drinksAlcohol", emoji: "🍷", label: "Alcool", options: ["Jamais", "Parfois", "Souvent"] },
   { key: "smokes", emoji: "🚬", label: "Tabac", options: ["Jamais", "Parfois", "Souvent"] },
   { key: "doesSport", emoji: "🏋️", label: "Sport", options: ["Jamais", "Parfois", "Régulièrement"] },
+  { key: "religion", emoji: "🙏", label: "Religion", optional: true, options: ["Chrétien(ne)", "Musulman(e)", "Autre", "Sans religion", "Préfère ne pas dire"] },
+  { key: "astroSign", emoji: "✨", label: "Signe astrologique", optional: true, options: ["Bélier", "Taureau", "Gémeaux", "Cancer", "Lion", "Vierge", "Balance", "Scorpion", "Sagittaire", "Capricorne", "Verseau", "Poissons"] },
 ];
 
 function ProfileSettingsModal({ extraInfo, extraInfoSaving, updateExtraInfo, onClose }) {
@@ -2613,6 +2617,7 @@ function ProfileSettingsModal({ extraInfo, extraInfoSaving, updateExtraInfo, onC
             <div key={field.key}>
               <p style={{ color: "#D8C4D0", fontSize: 12.5, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
                 {field.emoji} {field.label}
+                {field.optional && <span style={{ color: "#6B5A73", fontSize: 10.5, fontWeight: 400 }}>(optionnel)</span>}
                 {extraInfo[field.key] && <Check size={13} color="#3ECF6B" />}
                 {extraInfoSaving === field.key && <span style={{ color: "#8C7A94", fontSize: 10.5 }}>Enregistrement...</span>}
               </p>
@@ -2722,6 +2727,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [extraInfo, setExtraInfo] = useState({
     wantsMarriage: "", wantsChildren: "", educationLevel: "", hasPets: "", drinksAlcohol: "", smokes: "", doesSport: "",
+    religion: "", astroSign: "",
   });
   const [verificationStatus, setVerificationStatus] = useState("none");
   const [userPlan, setUserPlan] = useState("free");
@@ -2788,6 +2794,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
             drinksAlcohol: data.user.drinks_alcohol || "",
             smokes: data.user.smokes || "",
             doesSport: data.user.does_sport || "",
+            religion: data.user.religion || "",
+            astroSign: data.user.astro_sign || "",
           });
           setVerificationStatus(data.user.verification_status || "none");
           setUserPlan(data.user.plan || "free");
