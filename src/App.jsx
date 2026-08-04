@@ -731,6 +731,10 @@ function DiscoverScreen({ onNewMatch }) {
           showToast("Confirme ton email (voir Mon profil) avant de pouvoir liker des profils.");
           return;
         }
+        if (res.status === 403 && data.code === "PHOTO_REJECTED") {
+          showToast("Ta photo de profil a été refusée. Change-la dans Mon profil pour pouvoir liker à nouveau.");
+          return;
+        }
         if (data.matched) onNewMatch(current);
         if (isLikeAction) setLimits((l) => (l && !l.unlimited ? { ...l, remaining: Math.max(0, l.remaining - 1), used: l.used + 1 } : l));
         if (dir === "superlike") setCoins((c) => (c == null ? c : Math.max(0, c - 10)));
@@ -2757,6 +2761,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [pushStatus, setPushStatus] = useState("idle"); // "idle" | "enabling" | "enabled" | "error"
   const [pushError, setPushError] = useState("");
   const [emailVerified, setEmailVerified] = useState(true);
+  const [primaryPhotoStatus, setPrimaryPhotoStatus] = useState("approved");
   const [resendStatus, setResendStatus] = useState("idle"); // "idle" | "sending" | "sent" | "error"
   const [legalOpen, setLegalOpen] = useState(null);
   const [showMyPosts, setShowMyPosts] = useState(false);
@@ -2814,6 +2819,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           setUserPlan(data.user.plan || "free");
           setInvisible(!!data.user.invisible);
           setEmailVerified(data.user.email_verified !== 0 && data.user.email_verified !== false);
+          setPrimaryPhotoStatus(data.user.primary_photo_status || "approved");
           setAcceptGifts(data.user.accept_gifts !== 0 && data.user.accept_gifts !== false);
           setGiftSendersRestriction(data.user.gift_senders_restriction || "everyone");
           setHideGiftCount(!!data.user.hide_gift_count);
@@ -3085,6 +3091,19 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
             }}>{resendStatus === "sending" ? "Envoi..." : "Renvoyer l'email"}</button>
           )}
           {resendStatus === "error" && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>Échec de l'envoi. Réessaie dans un instant.</p>}
+        </div>
+      )}
+
+      {primaryPhotoStatus === "rejected" && (
+        <div style={{ marginTop: 14, padding: 14, borderRadius: 14, background: "rgba(255,107,91,0.12)", border: "1px solid rgba(255,107,91,0.35)" }}>
+          <p style={{ color: "#FF6B5B", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>📷 Photo de profil refusée</p>
+          <p style={{ color: "#D8C4D0", fontSize: 12, lineHeight: 1.5, marginBottom: 8 }}>
+            Ta photo de profil principale n'a pas été validée par la modération. Change-la dans l'onglet "Galerie" pour redevenir visible et pouvoir liker à nouveau.
+          </p>
+          <button onClick={() => setProfileTab("galerie")} style={{
+            background: "rgba(255,107,91,0.2)", border: "1px solid rgba(255,107,91,0.4)", color: "#FF6B5B",
+            borderRadius: 10, padding: "6px 12px", fontSize: 12, cursor: "pointer",
+          }}>Changer ma photo</button>
         </div>
       )}
 
@@ -4577,6 +4596,74 @@ function ModerationAdminSection({ adminKey }) {
   );
 }
 
+function ProfilePhotoModerationSection({ adminKey }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/profile-photos/pending`, { headers: { "x-admin-key": adminKey } });
+      const data = await res.json();
+      setUsers(data.users || []);
+    } catch {
+      setError("Impossible de charger les photos en attente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const decide = async (userId, decision) => {
+    setUsers((u) => u.filter((x) => x.id !== userId));
+    try {
+      await fetch(`${API_BASE}/api/admin/profile-photos/${userId}/moderate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ decision }),
+      });
+    } catch {
+      setError("Une décision n'a pas pu être enregistrée. Réessaie.");
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 24, marginBottom: 6 }}>
+        Photos de profil en attente ({users.length})
+      </p>
+      <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 20 }}>
+        Ces photos sont déjà visibles dans l'app (mode fluide) — un refus ici bloque le compte jusqu'à changement de photo.
+      </p>
+      {error && <p style={{ color: "#FF6B5B", fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
+      {loading && <p style={{ color: "#B39FBF" }}>Chargement...</p>}
+      {!loading && users.length === 0 && <p style={{ color: "#B39FBF" }}>Rien à modérer pour le moment 👍</p>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+        {users.map((u) => (
+          <div key={u.id} style={{ background: "#2A1B33", borderRadius: 14, padding: 12 }}>
+            <div style={{ width: "100%", aspectRatio: "1/1", borderRadius: 10, overflow: "hidden", marginBottom: 10, background: "#000" }}>
+              <img src={u.img} alt="À modérer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+            <p style={{ color: "#FBEFE9", fontSize: 12.5, marginBottom: 10 }}>{u.name} <span style={{ color: "#8C7A94" }}>({u.email})</span></p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => decide(u.id, "rejected")} style={{
+                flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
+                background: "rgba(255,107,91,0.15)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 12.5,
+              }}>Refuser</button>
+              <button onClick={() => decide(u.id, "approved")} style={{
+                flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
+                background: "rgba(79,168,255,0.15)", color: "#A78BFA", border: "1px solid rgba(79,168,255,0.4)", fontSize: 12.5,
+              }}>Approuver</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdminScreen() {
   const [adminKey, setAdminKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -4672,12 +4759,19 @@ function AdminScreen() {
           background: tab === "moderation" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
           color: tab === "moderation" ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.12)",
         }}>Modération</button>
+        <button onClick={() => setTab("photos")} style={{
+          padding: "9px 18px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          background: tab === "photos" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+          color: tab === "photos" ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.12)",
+        }}>Photos de profil</button>
       </div>
 
       {tab === "gifts" ? (
         <GiftsAdminSection adminKey={adminKey} />
       ) : tab === "moderation" ? (
         <ModerationAdminSection adminKey={adminKey} />
+      ) : tab === "photos" ? (
+        <ProfilePhotoModerationSection adminKey={adminKey} />
       ) : (
         <>
       <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 24, marginBottom: 20 }}>
