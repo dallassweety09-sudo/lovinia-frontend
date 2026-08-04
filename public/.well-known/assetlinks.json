@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "fr.lovinia.app",
+        "sha256_cert_fingerprints": ["59:57:EF:48:02:A9:A9:0A:2D:25:F8:17:DF:8E:68:03:F9:B7:4D:8D:DB:F3:F8:82:08:00:3C:CA:75:99:C9:98"]
+      }
+    }]
