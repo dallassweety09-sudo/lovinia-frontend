@@ -376,25 +376,38 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
           <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
           {profile.verification_status === "verified" && <BadgeCheck size={20} color="#A78BFA" fill="#1B1223" />}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13 }}>
-          <MapPin size={13} /> {profile.city}{profile.profession ? ` · ${profile.profession}` : ""}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13, flexWrap: "wrap" }}>
+          <MapPin size={13} />
+          {profile.city}
+          {profile.distance_km != null ? ` · à ${profile.distance_km} km` : ""}
+          {profile.profession ? ` · ${profile.profession}` : ""}
         </div>
-        <p style={{ marginTop: 10, color: "#F0E3EC", fontSize: 14, lineHeight: 1.5, maxWidth: 320 }}>{profile.bio}</p>
+        <p style={{
+          marginTop: 10, color: "#F0E3EC", fontSize: 14, lineHeight: 1.5, maxWidth: 320,
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+        }}>{profile.bio}</p>
         <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
-          {(profile.interests?.length ? profile.interests : profile.tags || []).map((t) => (
+          {(profile.interests?.length ? profile.interests : profile.tags || []).slice(0, 5).map((t) => (
             <span key={t} style={{
               fontSize: 12, padding: "5px 11px", borderRadius: 999,
               background: "rgba(255,255,255,0.14)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.2)",
             }}>{t}</span>
           ))}
+          {(profile.interests?.length ? profile.interests : profile.tags || []).length > 5 && (
+            <span style={{
+              fontSize: 12, padding: "5px 11px", borderRadius: 999,
+              background: "rgba(255,255,255,0.08)", color: "#D8C4D0", border: "1px solid rgba(255,255,255,0.2)",
+            }}>+{(profile.interests?.length ? profile.interests : profile.tags || []).length - 5}</span>
+          )}
         </div>
         {isTop && PREFERENCE_DISPLAY_FIELDS.some((f) => profile?.[f.key]) && (
           <button onClick={() => onShowPreferences?.(profile)} style={{
-            marginTop: 12, display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "6px 13px", color: "#FBEFE9",
-            fontSize: 12, cursor: "pointer",
+            marginTop: 12, display: "flex", alignItems: "center", gap: 6,
+            background: "linear-gradient(120deg, rgba(255,107,91,0.35), rgba(155,93,229,0.35))",
+            border: "1px solid rgba(255,255,255,0.3)", borderRadius: 999, padding: "7px 14px", color: "#FBEFE9",
+            fontSize: 12.5, fontWeight: 700, fontFamily: "Manrope, sans-serif", cursor: "pointer",
           }}>
-            <Eye size={13} /> Voir les préférences
+            <Eye size={14} /> Voir à propos & préférences
           </button>
         )}
       </div>
