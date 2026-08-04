@@ -2756,6 +2756,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [showMyPosts, setShowMyPosts] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [profileTab, setProfileTab] = useState("profil"); // "profil" | "galerie" | "apropos" | "verif"
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [showCreatorDashboard, setShowCreatorDashboard] = useState(false);
   const [acceptGifts, setAcceptGifts] = useState(true);
@@ -3039,6 +3040,27 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         )}
       </div>
 
+      {/* Barre d'onglets, même style que la fiche profil des autres utilisateurs */}
+      <div style={{ display: "flex", overflowX: "auto", gap: 6, marginTop: 18 }}>
+        {[
+          { key: "profil", label: "Profil", icon: <User size={14} /> },
+          { key: "galerie", label: "Galerie", icon: <Grid size={14} /> },
+          { key: "apropos", label: "À propos", icon: <User size={14} /> },
+          { key: "verif", label: "Vérif. & Compatibilité", icon: <Heart size={14} /> },
+        ].map((t) => (
+          <button key={t.key} onClick={() => setProfileTab(t.key)} style={{
+            display: "flex", alignItems: "center", gap: 5, padding: "8px 13px", borderRadius: 999, cursor: "pointer",
+            whiteSpace: "nowrap", flexShrink: 0, fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+            background: profileTab === t.key ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+            color: profileTab === t.key ? "#2A0E12" : "#D8C4D0",
+            border: profileTab === t.key ? "none" : "1px solid rgba(255,255,255,0.1)",
+          }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {profileTab === "verif" && (
       <div style={{ marginTop: 22, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <BadgeCheck size={17} color={verificationStatus === "verified" ? "#A78BFA" : "#8C7A94"} />
@@ -3082,6 +3104,10 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           </>
         )}
       </div>
+      )}
+
+      {profileTab === "apropos" && (
+      <>
       <button onClick={() => setShowProfileSettings(true)} style={{
         marginTop: 20, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
         background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
@@ -3093,7 +3119,11 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {showProfileSettings && (
         <ProfileSettingsModal extraInfo={extraInfo} extraInfoSaving={extraInfoSaving} updateExtraInfo={updateExtraInfo} onClose={() => setShowProfileSettings(false)} />
       )}
+      </>
+      )}
 
+      {profileTab === "galerie" && (
+      <>
       <div style={{ marginTop: 24 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes photos</label>
         <div style={{ marginTop: 8 }}>
@@ -3101,6 +3131,20 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         </div>
       </div>
 
+      <button onClick={() => setShowMyPosts((s) => !s)} style={{
+        marginTop: 20, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Video size={16} color="#8C7A94" /> Mes publications</span>
+        <ChevronRight size={16} color="#8C7A94" style={{ transform: showMyPosts ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+      </button>
+      {showMyPosts && <MyPostsSection currentUserId={user?.id} userPlan={userPlan} />}
+      </>
+      )}
+
+      {profileTab === "profil" && (
+      <>
       <div style={{ marginTop: 20 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Bio</label>
         <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} style={{
@@ -3132,6 +3176,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           {saving ? "Enregistrement..." : saved ? "Enregistré ✓" : "Enregistrer les modifications"}
         </button>
       )}
+      </>
+      )}
 
       <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -3158,16 +3204,6 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Eye size={16} color="#8C7A94" /> Qui a visité mon profil</span>
         <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
       </button>
-
-      <button onClick={() => setShowMyPosts((s) => !s)} style={{
-        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Video size={16} color="#8C7A94" /> Mes publications</span>
-        <ChevronRight size={16} color="#8C7A94" style={{ transform: showMyPosts ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
-      </button>
-      {showMyPosts && <MyPostsSection currentUserId={user?.id} userPlan={userPlan} />}
 
       <button onClick={() => setShowWallet(true)} style={{
         marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
