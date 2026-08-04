@@ -2979,26 +2979,96 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 
   return (
     <div style={{ padding: "18px 18px 0" }}>
-      <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 24, fontWeight: 600, color: "#FBEFE9" }}>Mon profil</span>
-
-      <div style={{ marginTop: 14, padding: 14, borderRadius: 16, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <p style={{ color: "#FBEFE9", fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 700, margin: 0 }}>
-            Profil complété à {profileCompletion} %
-          </p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => setProfileTab("galerie")} style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <div style={{
+              width: 68, height: 68, borderRadius: "50%", background: "#3A2645", overflow: "hidden",
+              display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid rgba(255,255,255,0.14)",
+            }}>
+              {photos[0] ? (
+                <img src={photos[0]} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <User size={28} color="#F2B84B" />
+              )}
+            </div>
+            <div style={{
+              position: "absolute", bottom: -2, right: -2, width: 24, height: 24, borderRadius: "50%",
+              background: "linear-gradient(120deg, #FF6B5B, #E8548A)", border: "2px solid #0A0611",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Camera size={12} color="#2A0E12" />
+            </div>
+          </button>
+          <div>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Manrope, sans-serif", fontSize: 19, fontWeight: 800, color: "#FBEFE9" }}>
+              {name || "Mon profil"}
+              {verificationStatus === "verified" && <BadgeCheck size={16} color="#A78BFA" />}
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, color: "#3ECF6B", fontSize: 12 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3ECF6B" }} /> En ligne
+            </span>
+          </div>
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
-          <div style={{
-            width: `${profileCompletion}%`, height: "100%", borderRadius: 3, transition: "width 0.4s ease",
-            background: "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)",
-          }} />
+        <button onClick={() => setProfileTab("profil")} style={{
+          display: "flex", alignItems: "center", gap: 6, padding: "9px 12px", borderRadius: 999, cursor: "pointer",
+          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", color: "#FBEFE9",
+          fontFamily: "Manrope, sans-serif", fontSize: 12, fontWeight: 700, flexShrink: 0,
+        }}>
+          <Settings size={13} /> Modifier
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16, padding: 14, borderRadius: 16, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 10 }}>
+          <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+            <div style={{
+              width: `${profileCompletion}%`, height: "100%", borderRadius: 4, transition: "width 0.4s ease",
+              background: "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)",
+            }} />
+          </div>
+          <span style={{
+            flexShrink: 0, background: "linear-gradient(120deg, #FF6B5B, #E8548A)", color: "#2A0E12",
+            fontFamily: "Manrope, sans-serif", fontSize: 11.5, fontWeight: 800, padding: "4px 10px", borderRadius: 999,
+          }}>{profileCompletion}%</span>
         </div>
         {profileCompletion < 100 && (
-          <p style={{ color: "#8B7A93", fontSize: 11.5, marginTop: 8, lineHeight: 1.4 }}>
-            Ajoute plus d'informations pour recevoir davantage de matchs et inspirer plus de confiance.
+          <p style={{ color: "#8B7A93", fontSize: 11.5, margin: 0, lineHeight: 1.4, textAlign: "center" }}>
+            Finalise ton profil pour être visible par plus de monde !
           </p>
         )}
       </div>
+
+      {photos.length < 2 && (
+        <button onClick={() => setProfileTab("galerie")} style={{
+          marginTop: 12, width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, cursor: "pointer",
+          background: "rgba(255,107,91,0.08)", border: "1px solid rgba(255,107,91,0.25)", textAlign: "left",
+        }}>
+          <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(255,107,91,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Camera size={19} color="#FF6B5B" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 13, margin: 0 }}>Ajoute au moins 2 photos</p>
+            <p style={{ color: "#8C7A94", fontSize: 11.5, margin: "2px 0 0", lineHeight: 1.4 }}>Augmente tes chances d'être liké·e.</p>
+          </div>
+          <span style={{ color: "#8C7A94" }}>›</span>
+        </button>
+      )}
+      {verificationStatus !== "verified" && (
+        <button onClick={() => setProfileTab("verif")} style={{
+          marginTop: 10, width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, cursor: "pointer",
+          background: "rgba(155,93,229,0.08)", border: "1px solid rgba(155,93,229,0.25)", textAlign: "left",
+        }}>
+          <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(155,93,229,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <BadgeCheck size={19} color="#A78BFA" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 13, margin: 0 }}>Vérifier mon identité</p>
+            <p style={{ color: "#8C7A94", fontSize: 11.5, margin: "2px 0 0", lineHeight: 1.4 }}>Rassure les autres membres avec le badge bleu.</p>
+          </div>
+          <span style={{ color: "#8C7A94" }}>›</span>
+        </button>
+      )}
 
       {!emailVerified && (
         <div style={{ marginTop: 14, padding: 14, borderRadius: 14, background: "rgba(242,184,75,0.12)", border: "1px solid rgba(242,184,75,0.35)" }}>
@@ -3017,34 +3087,6 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           {resendStatus === "error" && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>Échec de l'envoi. Réessaie dans un instant.</p>}
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 20 }}>
-        <div style={{
-          width: 100, height: 100, borderRadius: "50%",
-          background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
-          padding: 3, display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <div style={{
-            width: "100%", height: "100%", borderRadius: "50%", background: "#3A2645", overflow: "hidden",
-            display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #0A0611",
-          }}>
-            {photos[0] ? (
-              <img src={photos[0]} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <User size={40} color="#F2B84B" />
-            )}
-          </div>
-        </div>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{
-          background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)",
-          color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 700, textAlign: "center",
-          marginTop: 14, padding: "4px 0", outline: "none", width: 200,
-        }} />
-        {verificationStatus === "verified" && (
-          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#A78BFA", fontSize: 12.5, marginTop: 6 }}>
-            <BadgeCheck size={15} /> Profil vérifié
-          </span>
-        )}
-      </div>
 
       {/* Barre d'onglets, même style que la fiche profil des autres utilisateurs */}
       <div style={{ display: "flex", overflowX: "auto", gap: 6, marginTop: 18 }}>
@@ -3152,6 +3194,14 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {profileTab === "profil" && (
       <>
       <div style={{ marginTop: 20 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Prénom</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{
+          width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+          borderRadius: 12, color: "#FBEFE9", fontSize: 14, padding: 12, outline: "none", boxSizing: "border-box",
+        }} />
+      </div>
+
+      <div style={{ marginTop: 20 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Bio</label>
         <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} style={{
           width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
@@ -3202,49 +3252,28 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
         </p>
       </div>
 
-      <button onClick={() => setShowVisitors(true)} style={{
-        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Eye size={16} color="#8C7A94" /> Qui a visité mon profil</span>
-        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
-      </button>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 15, fontWeight: 800, marginTop: 24, marginBottom: 10 }}>Mes fonctionnalités</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {[
+          { onClick: () => setShowVisitors(true), icon: <Eye size={19} color="#FF6B5B" />, iconBg: "rgba(255,107,91,0.18)", title: "Qui a visité mon profil", desc: "Vois qui s'intéresse à toi." },
+          { onClick: () => setShowSubscriptions(true), icon: <Crown size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Abonnements", desc: userPlan !== "free" ? `Pack ${SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan} actif` : "Premium, VIP, Super VIP." },
+          { onClick: () => setShowWallet(true), icon: <Wallet size={19} color="#F2B84B" />, iconBg: "rgba(242,184,75,0.18)", title: "Mon portefeuille", desc: "Solde, recharge, historique." },
+          ...(userPlan === "gold" || userPlan === "vip" ? [{ onClick: () => setShowCreatorDashboard(true), icon: <Gem size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Tableau de bord créateur", desc: "Gains, retraits, statistiques." }] : []),
+        ].map((card) => (
+          <button key={card.title} onClick={card.onClick} style={{
+            display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 16, cursor: "pointer",
+            background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)", textAlign: "left",
+          }}>
+            <div style={{ width: 38, height: 38, borderRadius: "50%", background: card.iconBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {card.icon}
+            </div>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 12.5, margin: 0 }}>{card.title}</p>
+            <p style={{ color: "#8C7A94", fontSize: 10.5, margin: 0, lineHeight: 1.35 }}>{card.desc}</p>
+          </button>
+        ))}
+      </div>
 
-      <button onClick={() => setShowWallet(true)} style={{
-        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Wallet size={16} color="#F2B84B" /> Mon portefeuille (Coins)</span>
-        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
-      </button>
-
-      <button onClick={() => setShowSubscriptions(true)} style={{
-        marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-        background: userPlan !== "free" ? "rgba(155,93,229,0.12)" : "rgba(255,255,255,0.06)",
-        border: userPlan !== "free" ? "1px solid rgba(155,93,229,0.4)" : "1px solid rgba(255,255,255,0.12)",
-        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Crown size={16} color="#F2B84B" /> Abonnements
-          {userPlan !== "free" && <span style={{ color: "#C9AEFF", fontSize: 11, fontWeight: 700 }}>· {SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan}</span>}
-        </span>
-        <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
-      </button>
-
-      {(userPlan === "gold" || userPlan === "vip") && (
-        <button onClick={() => setShowCreatorDashboard(true)} style={{
-          marginTop: 12, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-          color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Gem size={16} color="#A78BFA" /> Tableau de bord créateur</span>
-          <span style={{ color: "#8C7A94", fontSize: 12 }}>›</span>
-        </button>
-      )}
-
-      <div style={{ marginTop: 12, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
+      <div style={{ marginTop: 16, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 14, fontWeight: 600 }}>
             <Gift size={17} color="#F2B84B" /> Réception des cadeaux
