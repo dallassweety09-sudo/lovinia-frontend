@@ -5,6 +5,12 @@ import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles,
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
 const API_BASE = "https://dating-app-backend-production-2f11.up.railway.app";
 
+// Ouvre les pages légales (CGU, confidentialité, sécurité des mineurs) dans le vrai navigateur
+// plutôt que dans une fenêtre interne à l'app — requis pour la conformité Google Play sur une TWA.
+function openLegalPage(doc) {
+  window.open(`https://lovinia.fr/legal?doc=${doc}`, "_blank", "noopener,noreferrer");
+}
+
 // CLOUDINARY : pour l'upload réel de photos de profil depuis le téléphone.
 // Remplis ces deux valeurs une fois ton compte Cloudinary créé (voir guide fourni).
 const CLOUDINARY_CLOUD_NAME = "bodjxzrq";
@@ -3306,12 +3312,6 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {showSubscriptions && <SubscriptionsModal currentPlan={userPlan} onClose={() => setShowSubscriptions(false)} onSubscribed={(p) => setUserPlan(p)} />}
       {showCreatorDashboard && <CreatorDashboardModal onClose={() => setShowCreatorDashboard(false)} />}
 
-      <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 16 }}>
-        <p style={{ color: "#D8C4D0", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-          L'ajout de photos, le mode invisible et les visiteurs sont disponibles dès maintenant. La vérification d'identité par selfie est déjà active un peu plus haut.
-        </p>
-      </div>
-
       <button onClick={onLogout} style={{
         marginTop: 16, width: "100%", padding: "13px 0", borderRadius: 999, cursor: "pointer",
         background: "rgba(255,255,255,0.06)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 14, fontFamily: "Manrope, sans-serif", fontWeight: 700,
@@ -3352,13 +3352,13 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       )}
 
       <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 4, marginBottom: 20, flexWrap: "wrap" }}>
-        <button onClick={() => setLegalOpen("terms")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
+        <button onClick={() => openLegalPage("terms")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
           Conditions d'utilisation
         </button>
-        <button onClick={() => setLegalOpen("privacy")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
+        <button onClick={() => openLegalPage("privacy")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
           Politique de confidentialité
         </button>
-        <button onClick={() => setLegalOpen("child-safety")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
+        <button onClick={() => openLegalPage("child-safety")} style={{ background: "none", border: "none", color: "#6B5A73", fontSize: 11.5, textDecoration: "underline", cursor: "pointer" }}>
           Sécurité des mineurs
         </button>
       </div>
@@ -4281,11 +4281,11 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
               />
               <span style={{ color: "#FBEFE9", fontSize: 13, lineHeight: 1.5 }}>
                 Je certifie avoir au moins 18 ans et j'accepte les{" "}
-                <span onClick={(e) => { e.preventDefault(); setLegalOpen("terms"); }} style={{ color: "#F2B84B", textDecoration: "underline", cursor: "pointer" }}>
+                <span onClick={(e) => { e.preventDefault(); openLegalPage("terms"); }} style={{ color: "#F2B84B", textDecoration: "underline", cursor: "pointer" }}>
                   Conditions d'utilisation
                 </span>{" "}
                 et la{" "}
-                <span onClick={(e) => { e.preventDefault(); setLegalOpen("privacy"); }} style={{ color: "#F2B84B", textDecoration: "underline", cursor: "pointer" }}>
+                <span onClick={(e) => { e.preventDefault(); openLegalPage("privacy"); }} style={{ color: "#F2B84B", textDecoration: "underline", cursor: "pointer" }}>
                   Politique de confidentialité
                 </span>{" "}
                 de Lovinia.
