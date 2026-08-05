@@ -428,8 +428,34 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
 
 const DEFAULT_FILTERS = {
   genre: "Tous", ageMin: 18, ageMax: 45, distance: 50, intention: "Toutes",
-  verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false,
+  verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false, ville: "",
 };
+// Les filtres de découverte sont mémorisés sur cet appareil (comme sur Tinder/Facebook) :
+// une fois enregistrés, ils restent actifs même après avoir changé d'onglet, fermé
+// l'application ou l'avoir rouverte plus tard — jusqu'à ce que l'utilisateur les change lui-même.
+function getFiltersStorageKey(userId) {
+  return `lovinia_filters_${userId || "guest"}`;
+}
+function loadStoredFilters(userId) {
+  try {
+    const raw = localStorage.getItem(getFiltersStorageKey(userId));
+    if (!raw) return DEFAULT_FILTERS;
+    const parsed = JSON.parse(raw);
+    // Fusionné avec les valeurs par défaut : si de nouveaux filtres sont ajoutés plus tard,
+    // les anciens réglages sauvegardés restent valides sans faire planter l'écran.
+    return { ...DEFAULT_FILTERS, ...parsed };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+function saveStoredFilters(userId, filters) {
+  try {
+    localStorage.setItem(getFiltersStorageKey(userId), JSON.stringify(filters));
+  } catch {
+    // Stockage indisponible (navigation privée, quota plein...) : les filtres fonctionnent
+    // quand même pour la session en cours, ils ne seront simplement pas mémorisés.
+  }
+}
 
 function FiltersPanel({ filters, onApply, onClose }) {
   const [draft, setDraft] = useState(filters);
@@ -498,6 +524,21 @@ function FiltersPanel({ filters, onApply, onClose }) {
         <input type="range" min={1} max={100} value={draft.distance}
           onChange={(e) => set("distance", Number(e.target.value))}
           style={{ width: "100%", marginTop: 8, accentColor: "#FF6B5B" }} />
+      </div>
+
+      <div style={{ marginBottom: 22 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Ville</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, padding: "10px 14px" }}>
+          <MapPin size={16} color="#8C7A94" />
+          <input
+            value={draft.ville} onChange={(e) => set("ville", e.target.value)}
+            placeholder="Ex: Douala, Yaoundé..."
+            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#FBEFE9", fontSize: 13.5 }}
+          />
+          {draft.ville && (
+            <X size={15} color="#8C7A94" style={{ cursor: "pointer" }} onClick={() => set("ville", "")} />
+          )}
+        </div>
       </div>
 
       <div style={{ marginBottom: 22, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -576,8 +617,10 @@ function FiltersPanel({ filters, onApply, onClose }) {
   );
 }
 
-function DiscoverScreen({ onNewMatch }) {
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+function DiscoverScreen({ onNewMatch, userId }) {
+  // Initialisé une seule fois depuis les filtres mémorisés sur cet appareil (sinon les valeurs
+  // par défaut) — évite que l'écran s'ouvre un instant avec les défauts avant d'appliquer les siens.
+  const [filters, setFilters] = useState(() => loadStoredFilters(userId));
   const [showFilters, setShowFilters] = useState(false);
   const [deck, setDeck] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -660,6 +703,7 @@ function DiscoverScreen({ onNewMatch }) {
           tailleMax: f.tailleMax || "",
           commonInterests: f.commonInterests ? "true" : "false",
           maxDistance: f.distance || "",
+          ville: f.ville || "",
         });
         const res = await fetch(`${API_BASE}/api/discover?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -680,7 +724,8 @@ function DiscoverScreen({ onNewMatch }) {
       // Mode démo : pas de backend, on filtre les faux profils locaux.
       const next = PROFILES.filter((p) =>
         (f.genre === "Tous" || p.genre === f.genre) && p.age >= f.ageMin && p.age <= f.ageMax &&
-        (!f.intention || f.intention === "Toutes" || p.intention === f.intention)
+        (!f.intention || f.intention === "Toutes" || p.intention === f.intention) &&
+        (!f.ville || p.city.toLowerCase().includes(f.ville.trim().toLowerCase()))
       );
       setDeck(next);
     }
@@ -691,6 +736,7 @@ function DiscoverScreen({ onNewMatch }) {
 
   const applyFilters = (f) => {
     setFilters(f);
+    saveStoredFilters(userId, f); // Deviennent les filtres par défaut : réappliqués tant que l'utilisateur ne les change pas lui-même.
     setShowFilters(false);
     loadProfiles(f);
   };
@@ -5042,7 +5088,7 @@ function MainApp() {
       ) : (
         <>
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} />}
+            {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} userId={user?.id} />}
             {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} onViewProfile={openProfile} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
             {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} />}
