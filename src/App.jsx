@@ -428,7 +428,7 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
 
 const DEFAULT_FILTERS = {
   genre: "Tous", ageMin: 18, ageMax: 45, distance: 50, intention: "Toutes",
-  verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false, ville: "",
+  verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false, pays: "", ville: "",
 };
 // Les filtres de découverte sont mémorisés sur cet appareil (comme sur Tinder/Facebook) :
 // une fois enregistrés, ils restent actifs même après avoir changé d'onglet, fermé
@@ -527,17 +527,35 @@ function FiltersPanel({ filters, onApply, onClose }) {
       </div>
 
       <div style={{ marginBottom: 22 }}>
-        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Ville</label>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Pays</label>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, padding: "10px 14px" }}>
           <MapPin size={16} color="#8C7A94" />
-          <input
+          <select
+            value={draft.pays} onChange={(e) => setDraft((d) => ({ ...d, pays: e.target.value, ville: "" }))}
+            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#FBEFE9", fontSize: 13.5, colorScheme: "dark" }}
+          >
+            <option value="">Tous les pays</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 22 }}>
+        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Ville</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, padding: "10px 14px", opacity: draft.pays ? 1 : 0.5 }}>
+          <MapPin size={16} color="#8C7A94" />
+          <select
             value={draft.ville} onChange={(e) => set("ville", e.target.value)}
-            placeholder="Ex: Douala, Yaoundé..."
-            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#FBEFE9", fontSize: 13.5 }}
-          />
-          {draft.ville && (
-            <X size={15} color="#8C7A94" style={{ cursor: "pointer" }} onClick={() => set("ville", "")} />
-          )}
+            disabled={!draft.pays}
+            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#FBEFE9", fontSize: 13.5, colorScheme: "dark", cursor: draft.pays ? "pointer" : "not-allowed" }}
+          >
+            <option value="">{draft.pays ? "Toutes les villes" : "Choisis d'abord un pays"}</option>
+            {citiesForCountry(draft.pays).map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -704,6 +722,7 @@ function DiscoverScreen({ onNewMatch, userId }) {
           commonInterests: f.commonInterests ? "true" : "false",
           maxDistance: f.distance || "",
           ville: f.ville || "",
+          pays: f.pays || "",
         });
         const res = await fetch(`${API_BASE}/api/discover?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -725,7 +744,8 @@ function DiscoverScreen({ onNewMatch, userId }) {
       const next = PROFILES.filter((p) =>
         (f.genre === "Tous" || p.genre === f.genre) && p.age >= f.ageMin && p.age <= f.ageMax &&
         (!f.intention || f.intention === "Toutes" || p.intention === f.intention) &&
-        (!f.ville || p.city.toLowerCase().includes(f.ville.trim().toLowerCase()))
+        (!f.ville || p.city.toLowerCase().includes(f.ville.trim().toLowerCase())) &&
+        (!f.pays || citiesForCountry(f.pays).includes(p.city))
       );
       setDeck(next);
     }
@@ -1345,11 +1365,12 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
                 <p style={{ color: "#F0E3EC", fontSize: 14, lineHeight: 1.6, margin: 0 }}>{p.bio}</p>
               </ProfileInfoCard>
             )}
-            {(p.distance_km != null || p.city || p.profession || p.education_level || p.taille || p.langues?.length > 0) && (
+            {(p.distance_km != null || p.city || p.country || p.profession || p.education_level || p.taille || p.langues?.length > 0) && (
               <ProfileInfoCard icon={<BadgeCheck size={14} />} title="L'essentiel">
                 {[
                   p.distance_km != null && { q: "Distance", icon: <MapPin size={15} color="#A78BFA" />, v: `à ${p.distance_km} kilomètres` },
                   p.city && { q: "Ville", icon: <MapPin size={15} color="#A78BFA" />, v: p.city },
+                  p.country && { q: "Pays", icon: <MapPin size={15} color="#A78BFA" />, v: p.country },
                   p.profession && { q: "Profession", icon: <Settings size={15} color="#A78BFA" />, v: p.profession },
                   p.education_level && { q: "Études", icon: <GraduationCap size={15} color="#A78BFA" />, v: p.education_level },
                   p.taille && { q: "Taille", icon: <User size={15} color="#A78BFA" />, v: `${p.taille} cm` },
@@ -3616,6 +3637,103 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
 
 const GENRES = ["Homme", "Femme"];
 const GENRES_RECHERCHE = ["Homme", "Femme", "Tous"];
+// Pays pris en charge à l'inscription, avec leurs principales villes.
+// Architecture évolutive : pour ajouter un pays ou une ville, il suffit d'ajouter une entrée
+// ci-dessous (ou de compléter le tableau "cities" d'un pays existant) — rien d'autre à modifier,
+// le champ Pays et la liste de villes du formulaire se mettent à jour automatiquement.
+const COUNTRIES = [
+  // --- Afrique ---
+  { name: "Cameroun", cities: ["Douala", "Yaoundé", "Bafoussam", "Garoua", "Buea", "Ebolowa", "Bamenda", "Maroua", "Ngaoundéré", "Kribi", "Limbé", "Dschang", "Bertoua", "Kumba"] },
+  { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City", "Kaduna"] },
+  { name: "Ghana", cities: ["Accra", "Kumasi", "Tamale", "Takoradi"] },
+  { name: "Sénégal", cities: ["Dakar", "Thiès", "Rufisque", "Kaolack", "Ziguinchor", "Saint-Louis", "Touba", "Mbour"] },
+  { name: "Côte d'Ivoire", cities: ["Abidjan", "Bouaké", "Yamoussoukro", "San-Pédro", "Korhogo", "Daloa"] },
+  { name: "Maroc", cities: ["Casablanca", "Rabat", "Marrakech", "Fès", "Tanger", "Agadir"] },
+  { name: "Algérie", cities: ["Alger", "Oran", "Constantine", "Annaba"] },
+  { name: "Tunisie", cities: ["Tunis", "Sfax", "Sousse", "Bizerte"] },
+  { name: "Égypte", cities: ["Le Caire", "Alexandrie", "Gizeh", "Louxor"] },
+  { name: "Kenya", cities: ["Nairobi", "Mombasa", "Kisumu", "Nakuru"] },
+  { name: "Afrique du Sud", cities: ["Johannesburg", "Le Cap", "Durban", "Pretoria"] },
+  { name: "Gabon", cities: ["Libreville", "Port-Gentil", "Franceville", "Oyem"] },
+  { name: "RD Congo", cities: ["Kinshasa", "Lubumbashi", "Goma", "Bukavu", "Kisangani"] },
+  { name: "Congo", cities: ["Brazzaville", "Pointe-Noire", "Dolisie"] },
+  { name: "Mali", cities: ["Bamako", "Sikasso", "Mopti", "Kayes"] },
+  { name: "Togo", cities: ["Lomé", "Sokodé", "Kara"] },
+  { name: "Bénin", cities: ["Cotonou", "Porto-Novo", "Parakou"] },
+  { name: "Rwanda", cities: ["Kigali", "Butare", "Gisenyi"] },
+  { name: "Burkina Faso", cities: ["Ouagadougou", "Bobo-Dioulasso"] },
+  { name: "Niger", cities: ["Niamey", "Zinder", "Maradi"] },
+  { name: "Tchad", cities: ["N'Djamena", "Moundou"] },
+  { name: "Guinée", cities: ["Conakry", "Kankan", "Nzérékoré"] },
+  { name: "Mauritanie", cities: ["Nouakchott", "Nouadhibou"] },
+  { name: "Angola", cities: ["Luanda", "Huambo", "Lobito"] },
+  { name: "Mozambique", cities: ["Maputo", "Beira"] },
+  { name: "Zambie", cities: ["Lusaka", "Ndola"] },
+  { name: "Ouganda", cities: ["Kampala", "Entebbe"] },
+  { name: "Éthiopie", cities: ["Addis-Abeba", "Dire Dawa"] },
+  { name: "Tanzanie", cities: ["Dar es Salaam", "Dodoma", "Zanzibar"] },
+  { name: "Zimbabwe", cities: ["Harare", "Bulawayo"] },
+  { name: "Cap-Vert", cities: ["Praia", "Mindelo"] },
+  { name: "Centrafrique", cities: ["Bangui"] },
+  { name: "Guinée équatoriale", cities: ["Malabo", "Bata"] },
+  { name: "Comores", cities: ["Moroni"] },
+  { name: "Madagascar", cities: ["Antananarivo", "Toamasina"] },
+  { name: "Burundi", cities: ["Bujumbura"] },
+  // --- Europe ---
+  { name: "France", cities: ["Paris", "Marseille", "Lyon", "Bordeaux", "Toulouse", "Lille", "Nice", "Nantes", "Strasbourg", "Montpellier", "Rennes", "Reims", "Toulon"] },
+  { name: "Belgique", cities: ["Bruxelles", "Anvers", "Liège", "Charleroi"] },
+  { name: "Suisse", cities: ["Genève", "Lausanne", "Zurich", "Bâle"] },
+  { name: "Royaume-Uni", cities: ["Londres", "Manchester", "Birmingham", "Liverpool", "Glasgow", "Leeds"] },
+  { name: "Allemagne", cities: ["Berlin", "Munich", "Hambourg", "Cologne", "Francfort", "Stuttgart"] },
+  { name: "Italie", cities: ["Rome", "Milan", "Naples", "Turin", "Florence", "Bologne"] },
+  { name: "Espagne", cities: ["Madrid", "Barcelone", "Valence", "Séville", "Bilbao"] },
+  { name: "Portugal", cities: ["Lisbonne", "Porto", "Braga"] },
+  { name: "Pays-Bas", cities: ["Amsterdam", "Rotterdam", "La Haye", "Utrecht"] },
+  { name: "Luxembourg", cities: ["Luxembourg"] },
+  { name: "Suède", cities: ["Stockholm", "Göteborg", "Malmö"] },
+  { name: "Norvège", cities: ["Oslo", "Bergen"] },
+  { name: "Danemark", cities: ["Copenhague", "Aarhus"] },
+  { name: "Pologne", cities: ["Varsovie", "Cracovie", "Wrocław"] },
+  { name: "Irlande", cities: ["Dublin", "Cork"] },
+  { name: "Autriche", cities: ["Vienne", "Salzbourg"] },
+  { name: "Grèce", cities: ["Athènes", "Thessalonique"] },
+  { name: "Roumanie", cities: ["Bucarest", "Cluj-Napoca"] },
+  // --- Amérique ---
+  { name: "États-Unis", cities: ["New York", "Los Angeles", "Chicago", "Houston", "Atlanta", "Miami", "Washington"] },
+  { name: "Canada", cities: ["Toronto", "Montréal", "Vancouver", "Calgary", "Ottawa", "Québec", "Edmonton", "Winnipeg"] },
+  { name: "Mexique", cities: ["Mexico", "Guadalajara", "Monterrey", "Puebla"] },
+  { name: "Brésil", cities: ["São Paulo", "Rio de Janeiro", "Brasília", "Salvador", "Belo Horizonte"] },
+  { name: "Colombie", cities: ["Bogotá", "Medellín", "Cali", "Barranquilla"] },
+  { name: "Argentine", cities: ["Buenos Aires", "Córdoba", "Rosario"] },
+  { name: "Chili", cities: ["Santiago", "Valparaíso"] },
+  { name: "Pérou", cities: ["Lima", "Arequipa"] },
+  { name: "Venezuela", cities: ["Caracas", "Maracaibo"] },
+  { name: "République Dominicaine", cities: ["Saint-Domingue", "Santiago"] },
+  { name: "Haïti", cities: ["Port-au-Prince", "Cap-Haïtien"] },
+  { name: "Cuba", cities: ["La Havane", "Santiago de Cuba"] },
+  { name: "Costa Rica", cities: ["San José"] },
+  { name: "Panama", cities: ["Panama"] },
+  { name: "Équateur", cities: ["Quito", "Guayaquil"] },
+  // --- Asie ---
+  { name: "Chine", cities: ["Pékin", "Shanghai", "Canton", "Shenzhen"] },
+  { name: "Inde", cities: ["New Delhi", "Mumbai", "Bangalore", "Chennai", "Kolkata"] },
+  { name: "Japon", cities: ["Tokyo", "Osaka", "Yokohama"] },
+  { name: "Corée du Sud", cities: ["Séoul", "Busan"] },
+  { name: "Philippines", cities: ["Manille", "Cebu", "Davao"] },
+  { name: "Indonésie", cities: ["Jakarta", "Surabaya", "Bandung"] },
+  { name: "Vietnam", cities: ["Hô Chi Minh-Ville", "Hanoï"] },
+  { name: "Thaïlande", cities: ["Bangkok", "Chiang Mai"] },
+  { name: "Malaisie", cities: ["Kuala Lumpur", "Penang"] },
+  { name: "Émirats arabes unis", cities: ["Dubaï", "Abou Dabi", "Charjah"] },
+  { name: "Arabie saoudite", cities: ["Riyad", "Djeddah", "La Mecque"] },
+  { name: "Liban", cities: ["Beyrouth", "Tripoli"] },
+  { name: "Qatar", cities: ["Doha"] },
+  { name: "Pakistan", cities: ["Karachi", "Lahore", "Islamabad"] },
+  { name: "Bangladesh", cities: ["Dhaka", "Chittagong"] },
+];
+function citiesForCountry(countryName) {
+  return COUNTRIES.find((c) => c.name === countryName)?.cities || [];
+}
 const REGISTER_STEPS = ["compte", "details", "interets", "intention", "photos", "consentement"];
 const GOOGLE_COMPLETION_STEPS = ["details", "interets", "intention", "photos", "consentement"];
 
@@ -4181,7 +4299,7 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const [form, setForm] = useState({
     name: "", email: "", phone: "", password: "",
-    birthdate: "", genre: "", genre_recherche: "Tous", city: "", profession: "", taille: "",
+    birthdate: "", genre: "", genre_recherche: "Tous", country: "", city: "", profession: "", taille: "",
     interests: [], langues: [], intention: "", photos: [], acceptedTerms: false, orientation: "",
   });
   const [authMethod, setAuthMethod] = useState("email"); // "email" | "phone"
@@ -4203,12 +4321,14 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
   const steps = mode === "complete-google" ? GOOGLE_COMPLETION_STEPS : REGISTER_STEPS;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Changer de pays invalide la ville déjà choisie (elle appartenait à la liste de l'ancien pays).
+  const setCountry = (v) => setForm((f) => ({ ...f, country: v, city: "" }));
 
   const validateStep = () => {
     if (mode === "login") return true;
     const s = steps[step];
     if (s === "compte" && (!form.name || !form.password || (authMethod === "email" ? !form.email : !form.phone))) return "Merci de remplir tous les champs.";
-    if (s === "details" && (!form.birthdate || !form.genre || !form.city)) return "Merci de compléter tes informations.";
+    if (s === "details" && (!form.birthdate || !form.genre || !form.country || !form.city)) return "Merci de compléter tes informations.";
     if (s === "details") {
       const age = calcAgeClient(form.birthdate);
       if (age === null) return "Date de naissance invalide.";
@@ -4269,7 +4389,7 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           birthdate: form.birthdate, genre: form.genre, genre_recherche: form.genre_recherche,
-          city: form.city, profession: form.profession, taille: form.taille ? Number(form.taille) : null,
+          country: form.country, city: form.city, profession: form.profession, taille: form.taille ? Number(form.taille) : null,
           interests: form.interests, langues: form.langues, intention: form.intention, photos: form.photos,
         }),
       });
@@ -4468,7 +4588,40 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 12 }}><div style={fieldWrap}><MapPin size={16} color="#8C7A94" /><input placeholder="Ta ville" value={form.city} onChange={(e) => set("city", e.target.value)} style={fieldInput} /></div></div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: "#B39FBF", fontSize: 12 }}>Pays</label>
+              <div style={{ ...fieldWrap, marginTop: 6 }}>
+                <MapPin size={16} color="#8C7A94" />
+                <select
+                  value={form.country} onChange={(e) => setCountry(e.target.value)}
+                  style={{ ...fieldInput, colorScheme: "dark" }}
+                >
+                  <option value="">Choisis ton pays</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: "#B39FBF", fontSize: 12 }}>Ville</label>
+              <div style={{ ...fieldWrap, marginTop: 6, opacity: form.country ? 1 : 0.5 }}>
+                <MapPin size={16} color="#8C7A94" />
+                <select
+                  value={form.city} onChange={(e) => set("city", e.target.value)}
+                  disabled={!form.country}
+                  style={{ ...fieldInput, colorScheme: "dark", cursor: form.country ? "pointer" : "not-allowed" }}
+                >
+                  <option value="">{form.country ? "Choisis ta ville" : "Choisis d'abord ton pays"}</option>
+                  {citiesForCountry(form.country).map((city) => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </select>
+              </div>
+              {!form.country && (
+                <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 4 }}>Choisis d'abord ton pays pour voir la liste des villes.</p>
+              )}
+            </div>
             <div style={{ marginBottom: 12 }}><div style={fieldWrap}><input placeholder="Profession (facultatif)" value={form.profession} onChange={(e) => set("profession", e.target.value)} style={fieldInput} /></div></div>
             <div style={{ marginBottom: 8 }}><div style={fieldWrap}><input placeholder="Taille en cm (facultatif)" type="number" value={form.taille} onChange={(e) => set("taille", e.target.value)} style={fieldInput} /></div></div>
           </>
