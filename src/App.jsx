@@ -2913,6 +2913,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [invisible, setInvisible] = useState(false);
   const [invisibleSaving, setInvisibleSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const [showVisitors, setShowVisitors] = useState(false);
   const [pushStatus, setPushStatus] = useState("idle"); // "idle" | "enabling" | "enabled" | "error"
   const [pushError, setPushError] = useState("");
@@ -3139,6 +3141,43 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       onAccountDeleted();
     }
     setDeleting(false);
+  };
+  // La déconnexion n'est validée qu'après confirmation du serveur : si le téléphone n'a pas de
+  // connexion (ou que le serveur est injoignable), on n'efface rien localement et on prévient
+  // l'utilisateur, pour éviter une session incohérente (token effacé côté client mais toujours
+  // considéré actif côté serveur).
+  const handleLogoutClick = async () => {
+    setLogoutError("");
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setLogoutError("Connexion Internet indisponible. Veuillez réessayer lorsque vous serez connecté.");
+      return;
+    }
+    if (!API_BASE) {
+      // Mode démo : pas de serveur pour confirmer la fermeture de session, on déconnecte localement.
+      onLogout();
+      return;
+    }
+    setLoggingOut(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Un 401 signifie que le token était déjà invalide/expiré côté serveur : la session est
+      // de toute façon déjà terminée là-bas, donc on peut nettoyer localement sans risque.
+      if (res.ok || res.status === 401) {
+        onLogout();
+      } else {
+        setLogoutError("La déconnexion a échoué. Réessaie dans un instant.");
+      }
+    } catch {
+      // Échec réseau (pas de connexion, serveur injoignable...) : on ne déconnecte surtout pas
+      // localement, sinon l'utilisateur croirait être déconnecté alors que sa session reste ouverte.
+      setLogoutError("Connexion Internet indisponible. Veuillez réessayer lorsque vous serez connecté.");
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -3518,10 +3557,12 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {showSubscriptions && <SubscriptionsModal currentPlan={userPlan} onClose={() => setShowSubscriptions(false)} onSubscribed={(p) => setUserPlan(p)} />}
       {showCreatorDashboard && <CreatorDashboardModal onClose={() => setShowCreatorDashboard(false)} />}
 
-      <button onClick={onLogout} style={{
-        marginTop: 16, width: "100%", padding: "13px 0", borderRadius: 999, cursor: "pointer",
+      <button onClick={handleLogoutClick} disabled={loggingOut} style={{
+        marginTop: 16, width: "100%", padding: "13px 0", borderRadius: 999, cursor: loggingOut ? "default" : "pointer",
         background: "rgba(255,255,255,0.06)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)", fontSize: 14, fontFamily: "Manrope, sans-serif", fontWeight: 700,
-      }}>Se déconnecter</button>
+        opacity: loggingOut ? 0.7 : 1,
+      }}>{loggingOut ? "Déconnexion..." : "Se déconnecter"}</button>
+      {logoutError && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>{logoutError}</p>}
 
       {!confirmDelete ? (
         <button onClick={() => setConfirmDelete(true)} style={{
