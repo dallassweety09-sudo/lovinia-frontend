@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap, ShieldCheck, DollarSign } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -90,6 +90,42 @@ async function uploadMediaToCloudinary(file) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || "Échec de l'envoi du média.");
   return { url: data.secure_url, mediaType: isVideo ? "video" : "photo" };
+}
+// Lit la durée d'un fichier vidéo côté navigateur avant de l'envoyer (utilisé pour valider
+// la limite de durée avant l'upload, aussi bien pour les publications que pour la galerie de profil).
+function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const videoEl = document.createElement("video");
+    videoEl.preload = "metadata";
+    videoEl.onloadedmetadata = () => {
+      URL.revokeObjectURL(videoEl.src);
+      resolve(videoEl.duration);
+    };
+    videoEl.onerror = () => reject(new Error("Impossible de lire cette vidéo."));
+    videoEl.src = URL.createObjectURL(file);
+  });
+}
+// La galerie de profil mélange photos et courtes vidéos, dans l'ordre choisi par l'utilisateur.
+// Chaque élément est stocké sous la forme { url, type: "photo" | "video" }. Les comptes créés
+// avant l'introduction des vidéos ont un tableau de simples URLs (chaînes) : ces trois fonctions
+// permettent au reste de l'app de traiter les deux formats de façon transparente.
+function isVideoMedia(item) {
+  return !!(item && typeof item === "object" && item.type === "video");
+}
+function mediaUrl(item) {
+  return typeof item === "string" ? item : item?.url || "";
+}
+function normalizeMedia(arr) {
+  return (Array.isArray(arr) ? arr : []).map((m) =>
+    typeof m === "string" ? { url: m, type: "photo" } : m
+  ).filter((m) => m && m.url);
+}
+// Renvoie l'URL de la première PHOTO (pas vidéo) d'une galerie mixte — utilisée partout où on a
+// besoin d'une image fixe (avatar, vignette de liste...) plutôt que de risquer d'afficher une vidéo.
+function firstPhotoUrl(mediaArr) {
+  const items = normalizeMedia(mediaArr);
+  const item = items.find((m) => !isVideoMedia(m));
+  return item ? item.url : "";
 }
 
 const INTENTIONS = [
@@ -278,12 +314,14 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
   const cardRef = useRef(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const start = useRef({ x: 0, y: 0 });
-  const photos = (profile.photos && profile.photos.length) ? profile.photos : (profile.img ? [profile.img] : []);
+  const normalized = normalizeMedia(profile.photos);
+  const photos = normalized.length ? normalized : (profile.img ? [{ url: profile.img, type: "photo" }] : []);
   const [photoIndex, setPhotoIndex] = useState(0);
 
   useEffect(() => { setPhotoIndex(0); }, [profile.id]);
 
-  const currentPhoto = photos[Math.min(photoIndex, photos.length - 1)] || profile.img;
+  const currentItem = photos[Math.min(photoIndex, photos.length - 1)] || (profile.img ? { url: profile.img, type: "photo" } : null);
+  const currentPhoto = currentItem ? currentItem.url : profile.img;
 
   const handleDown = (clientX, clientY) => {
     if (!isTop) return;
@@ -341,8 +379,13 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
         touchAction: "none",
       }}
     >
-      <img src={currentPhoto} alt={profile.name} draggable={false}
-        style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+      {currentItem && isVideoMedia(currentItem) ? (
+        <video key={photoIndex} src={currentItem.url} autoPlay muted loop playsInline
+          style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+      ) : (
+        <img src={currentPhoto} alt={profile.name} draggable={false}
+          style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+      )}
       <div style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(to top, rgba(27,18,35,0.92) 0%, rgba(27,18,35,0.35) 45%, rgba(27,18,35,0) 65%)",
@@ -1236,8 +1279,10 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
 
   // En mode démo (sans backend), on affiche directement les infos déjà connues du match.
   const p = profile || match;
-  const photos = (p.photos && p.photos.length) ? p.photos : (p.img ? [p.img] : []);
-  const currentPhoto = photos[Math.min(photoIndex, Math.max(photos.length - 1, 0))] || p.img;
+  const normalizedMedia = normalizeMedia(p.photos);
+  const photos = normalizedMedia.length ? normalizedMedia : (p.img ? [{ url: p.img, type: "photo" }] : []);
+  const currentItem = photos[Math.min(photoIndex, Math.max(photos.length - 1, 0))] || (p.img ? { url: p.img, type: "photo" } : null);
+  const currentPhoto = currentItem ? currentItem.url : p.img;
 
   const TABS = [
     { key: "profil", label: "Profil", icon: <User size={14} /> },
@@ -1249,7 +1294,12 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
       <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", flexShrink: 0 }}>
-        <img src={currentPhoto} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        {currentItem && isVideoMedia(currentItem) ? (
+          <video key={photoIndex} src={currentItem.url} autoPlay muted loop playsInline
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <img src={currentPhoto} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
         <div style={{
           position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(27,18,35,0.92) 0%, rgba(27,18,35,0.1) 55%, rgba(27,18,35,0) 70%)",
         }} />
@@ -3210,11 +3260,14 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
               width: 68, height: 68, borderRadius: "50%", background: "#3A2645", overflow: "hidden",
               display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid rgba(255,255,255,0.14)",
             }}>
-              {photos[0] ? (
-                <img src={photos[0]} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <User size={28} color="#F2B84B" />
-              )}
+              {(() => {
+                const avatarUrl = firstPhotoUrl(photos);
+                return avatarUrl ? (
+                  <img src={avatarUrl} alt="Photo de profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <User size={28} color="#F2B84B" />
+                );
+              })()}
             </div>
             <div style={{
               position: "absolute", bottom: -2, right: -2, width: 24, height: 24, borderRadius: "50%",
@@ -3412,7 +3465,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       <div style={{ marginTop: 24 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes photos</label>
         <div style={{ marginTop: 8 }}>
-          <PhotoUploader photos={photos} onChange={setPhotos} />
+          <GalleryUploader photos={photos} onChange={setPhotos} />
         </div>
       </div>
 
@@ -3776,21 +3829,45 @@ function TagInput({ label, values, onChange, placeholder }) {
   );
 }
 
-function PhotoUploader({ photos, onChange }) {
+// Durée acceptée pour une courte vidéo de galerie : 3 à 5 secondes, avec une petite tolérance
+// pour ne pas frustrer l'utilisateur à cause d'un découpage imprécis côté téléphone.
+const GALLERY_VIDEO_MIN_DURATION = 2.5;
+const GALLERY_VIDEO_MAX_DURATION = 5.5;
+// Galerie mixte photos + courtes vidéos (comme Tinder) : l'utilisateur ajoute des photos et des
+// vidéos de 3 à 5 secondes dans un ordre libre, qu'il peut réorganiser avec les flèches ‹ ›.
+// La toute première PHOTO du tableau (peu importe sa position) sert de photo de profil partout
+// ailleurs dans l'app (listes de matchs, conversations...), donc c'est elle qui porte le badge
+// "Principale" plutôt que systématiquement l'élément en position 0.
+function GalleryUploader({ photos, onChange }) {
+  const items = normalizeMedia(photos);
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [manualUrl, setManualUrl] = useState("");
-  const [viewerUrl, setViewerUrl] = useState(null);
+  const [viewerItem, setViewerItem] = useState(null);
+
+  const primaryIndex = items.findIndex((m) => !isVideoMedia(m));
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadError("");
+    if (file.type?.startsWith("video/")) {
+      try {
+        const duration = await readVideoDuration(file);
+        if (duration < GALLERY_VIDEO_MIN_DURATION || duration > GALLERY_VIDEO_MAX_DURATION) {
+          setUploadError(`Cette vidéo dure ${duration.toFixed(1)} secondes. Les vidéos de la galerie doivent durer entre 3 et 5 secondes.`);
+          if (inputRef.current) inputRef.current.value = "";
+          return;
+        }
+      } catch {
+        // Si la durée ne peut pas être lue, on laisse passer plutôt que de bloquer l'envoi à tort.
+      }
+    }
     setUploading(true);
     try {
-      const url = await uploadPhotoToCloudinary(file);
-      onChange([...photos, url]);
+      const { url, mediaType } = await uploadMediaToCloudinary(file);
+      onChange([...items, { url, type: mediaType }]);
     } catch (err) {
       setUploadError(err.message || "Échec de l'envoi.");
     } finally {
@@ -3801,35 +3878,72 @@ function PhotoUploader({ photos, onChange }) {
 
   const addManualUrl = () => {
     if (manualUrl.trim()) {
-      onChange([...photos, manualUrl.trim()]);
+      onChange([...items, { url: manualUrl.trim(), type: "photo" }]);
       setManualUrl("");
     }
+  };
+
+  const removeAt = (i) => onChange(items.filter((_, idx) => idx !== i));
+  const move = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const next = [...items];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
   };
 
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        {photos.map((url, i) => (
-          <div key={i} style={{ position: "relative", aspectRatio: "3/4", borderRadius: 12, overflow: "hidden" }}>
-            <img
-              src={url} alt={`Photo ${i + 1}`}
-              onClick={() => setViewerUrl(url)}
-              style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }}
-            />
-            {i === 0 && (
+        {items.map((item, i) => (
+          <div key={i} style={{ position: "relative", aspectRatio: "3/4", borderRadius: 12, overflow: "hidden", background: "#000" }}>
+            {isVideoMedia(item) ? (
+              <video
+                src={mediaUrl(item)} muted loop playsInline
+                onClick={() => setViewerItem(item)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }}
+              />
+            ) : (
+              <img
+                src={mediaUrl(item)} alt={`Média ${i + 1}`}
+                onClick={() => setViewerItem(item)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }}
+              />
+            )}
+            {isVideoMedia(item) && (
+              <div style={{
+                position: "absolute", top: 4, left: 4, background: "rgba(27,18,35,0.75)", borderRadius: "50%",
+                width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+              }}><Play size={10} color="#FBEFE9" fill="#FBEFE9" /></div>
+            )}
+            {i === primaryIndex && (
               <span style={{
                 position: "absolute", bottom: 4, left: 4, background: "rgba(27,18,35,0.75)",
                 color: "#F2B84B", fontSize: 9.5, fontWeight: 600, padding: "2px 6px", borderRadius: 6,
               }}>Principale</span>
             )}
-            <button type="button" onClick={() => onChange(photos.filter((_, idx) => idx !== i))} style={{
+            <button type="button" onClick={() => removeAt(i)} style={{
               position: "absolute", top: 4, right: 4, background: "rgba(27,18,35,0.8)", border: "none",
               borderRadius: "50%", width: 22, height: 22, color: "#FBEFE9", cursor: "pointer", display: "flex",
               alignItems: "center", justifyContent: "center",
             }}><X size={12} /></button>
+            <div style={{ position: "absolute", bottom: 4, right: 4, display: "flex", gap: 3 }}>
+              {i > 0 && (
+                <button type="button" onClick={() => move(i, -1)} style={{
+                  background: "rgba(27,18,35,0.8)", border: "none", borderRadius: "50%", width: 20, height: 20,
+                  color: "#FBEFE9", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
+                }}>‹</button>
+              )}
+              {i < items.length - 1 && (
+                <button type="button" onClick={() => move(i, 1)} style={{
+                  background: "rgba(27,18,35,0.8)", border: "none", borderRadius: "50%", width: 20, height: 20,
+                  color: "#FBEFE9", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
+                }}>›</button>
+              )}
+            </div>
           </div>
         ))}
-        {photos.length < 6 && (
+        {items.length < 9 && (
           <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} style={{
             aspectRatio: "3/4", borderRadius: 12, border: "1px dashed rgba(255,255,255,0.25)",
             background: "rgba(255,255,255,0.04)", color: "#B39FBF", cursor: uploading ? "default" : "pointer",
@@ -3837,7 +3951,7 @@ function PhotoUploader({ photos, onChange }) {
           }}>{uploading ? "..." : "+"}</button>
         )}
       </div>
-      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
+      <input ref={inputRef} type="file" accept="image/*,video/*" onChange={handleFile} style={{ display: "none" }} />
       {!CLOUDINARY_CLOUD_NAME && (
         <div style={{ marginTop: 14 }}>
           <p style={{ color: "#6B5A73", fontSize: 11.5, marginBottom: 8 }}>
@@ -3853,22 +3967,28 @@ function PhotoUploader({ photos, onChange }) {
         </div>
       )}
       {uploadError && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 8 }}>{uploadError}</p>}
-      <p style={{ color: "#8C7A94", fontSize: 11.5, marginTop: 10 }}>{photos.length}/2 photos minimum</p>
+      <p style={{ color: "#8C7A94", fontSize: 11.5, marginTop: 10 }}>
+        {items.length}/2 minimum · photos et vidéos de 3 à 5 secondes · utilise ‹ › pour réordonner
+      </p>
 
-      {viewerUrl && (
+      {viewerItem && (
         <div
-          onClick={() => setViewerUrl(null)}
+          onClick={() => setViewerItem(null)}
           style={{
             position: "fixed", inset: 0, background: "rgba(10,6,14,0.92)", zIndex: 200,
             display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out",
           }}
         >
-          <button onClick={() => setViewerUrl(null)} style={{
+          <button onClick={() => setViewerItem(null)} style={{
             position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.12)", border: "none",
             borderRadius: "50%", width: 36, height: 36, color: "#FBEFE9", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}><X size={18} /></button>
-          <img src={viewerUrl} alt="Photo agrandie" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12, objectFit: "contain" }} />
+          {isVideoMedia(viewerItem) ? (
+            <video src={mediaUrl(viewerItem)} controls autoPlay loop playsInline style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12 }} onClick={(e) => e.stopPropagation()} />
+          ) : (
+            <img src={mediaUrl(viewerItem)} alt="Média agrandi" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12, objectFit: "contain" }} />
+          )}
         </div>
       )}
     </div>
@@ -4071,8 +4191,9 @@ function PublicLegalScreen() {
 }
 
 function OnboardingScreens({ initialStep = 0, onDone }) {
-  const [step, setStep] = useState(initialStep); // 0 = Bienvenue, 1 = Philosophie
+  const [step, setStep] = useState(initialStep); // 0 = Bienvenue, 1 = Philosophie, 2 = Sécurité
   const [direction, setDirection] = useState("forward"); // "forward" | "backward", pour le sens de la transition
+  const LAST_STEP = 2;
 
   const goTo = (next) => {
     setDirection(next > step ? "forward" : "backward");
@@ -4081,7 +4202,7 @@ function OnboardingScreens({ initialStep = 0, onDone }) {
 
   const dots = (
     <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 18 }}>
-      {[0, 1].map((i) => (
+      {[0, 1, 2].map((i) => (
         <button key={i} onClick={() => goTo(i)} style={{
           width: i === step ? 22 : 7, height: 7, borderRadius: 999, transition: "width 0.25s", border: "none", padding: 0, cursor: "pointer",
           background: i === step ? "linear-gradient(120deg, #FF6B5B, #E8548A, #9B5DE5)" : "rgba(255,255,255,0.18)",
@@ -4177,7 +4298,7 @@ function OnboardingScreens({ initialStep = 0, onDone }) {
               </div>
             </div>
           </div>
-        ) : (
+        ) : step === 1 ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
             <div style={{ position: "relative", width: 60, height: 46, marginBottom: 10 }}>
               <Heart size={40} color="#FF6B5B" style={{ position: "absolute", left: 0, top: 4 }} />
@@ -4259,6 +4380,69 @@ function OnboardingScreens({ initialStep = 0, onDone }) {
               ))}
             </div>
           </div>
+        ) : (
+          <div style={{ textAlign: "left" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <p style={{ fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 26, color: "#FBEFE9", margin: 0, lineHeight: 1.25 }}>
+                Votre sécurité<br />
+                <span style={{
+                  background: "linear-gradient(120deg, #FF6B5B, #E8548A)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                }}>est notre priorité</span>
+              </p>
+              <div style={{
+                width: 44, height: 44, borderRadius: "50%", flexShrink: 0, marginTop: 4,
+                background: "linear-gradient(120deg, #FF6B5B, #E8548A)", display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 8px 18px -6px rgba(232,84,138,0.6)",
+              }}>
+                <ShieldCheck size={22} color="#2A0E12" />
+              </div>
+            </div>
+
+            <p style={{ color: "#C6B4C9", fontSize: 13.5, lineHeight: 1.7, marginTop: 16 }}>
+              Chez Lovinia, nous souhaitons que chaque rencontre se déroule dans un climat de confiance.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 22 }}>
+              {[
+                { icon: <DollarSign size={17} color="#FBEFE9" />, text: "N'envoyez jamais d'argent à une personne que vous ne connaissez pas." },
+                { icon: <MapPin size={17} color="#FBEFE9" />, text: "Privilégiez toujours un premier rendez-vous dans un lieu public." },
+                { icon: <Flag size={17} color="#FBEFE9" />, text: "Signalez tout comportement suspect." },
+                { icon: <BadgeCheck size={17} color="#FBEFE9" />, text: "Vérifiez les profils grâce au badge de vérification." },
+              ].map((it, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                    background: "linear-gradient(120deg, #FF6B5B, #E8548A)", display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {it.icon}
+                  </div>
+                  <p style={{ color: "#F0E3EC", fontSize: 13.5, lineHeight: 1.5, margin: 0, marginTop: 5 }}>{it.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "22px 0" }} />
+
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(232,84,138,0.4)", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Video size={16} color="#E8548A" />
+              </div>
+              <p style={{ margin: 0, marginTop: 5 }}>
+                <span style={{ color: "#E8548A", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13.5 }}>Nouveauté : </span>
+                <span style={{ color: "#F0E3EC", fontSize: 13.5, lineHeight: 1.5 }}>
+                  Ajoutez des photos et des vidéos dans la même galerie pour mieux vous présenter et rendre votre profil encore plus vivant.
+                </span>
+              </p>
+            </div>
+
+            <p style={{
+              textAlign: "center", marginTop: 22, fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15,
+              background: "linear-gradient(120deg, #FF6B5B, #E8548A)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+            }}>Amusez-vous bien ! 💗</p>
+          </div>
         )}
       </div>
 
@@ -4278,7 +4462,7 @@ function OnboardingScreens({ initialStep = 0, onDone }) {
             </button>
           )}
           <button
-            onClick={() => (step === 0 ? goTo(1) : onDone())}
+            onClick={() => (step < LAST_STEP ? goTo(step + 1) : onDone())}
             style={{
               flex: 2, padding: "15px 0", borderRadius: 999, border: "none", cursor: "pointer",
               background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
@@ -4664,7 +4848,7 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
         {stepName === "photos" && (
           <>
             <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Ajoute tes photos</p>
-            <PhotoUploader photos={form.photos} onChange={(v) => set("photos", v)} />
+            <GalleryUploader photos={form.photos} onChange={(v) => set("photos", v)} />
           </>
         )}
 
@@ -5016,6 +5200,163 @@ function ProfilePhotoModerationSection({ adminKey }) {
   );
 }
 
+// Liste de tous les comptes (recherche par nom/email), avec suspension et suppression définitive.
+function UsersAdminSection({ adminKey }) {
+  const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null); // utilisateur en attente de confirmation de suppression
+  const [busyId, setBusyId] = useState(null);
+
+  const load = async (q) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users?search=${encodeURIComponent(q || "")}`, { headers: { "x-admin-key": adminKey } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Chargement impossible.");
+      setUsers(data.users || []);
+    } catch (e) {
+      setError(e.message || "Impossible de charger les comptes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(""); }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => load(search), 350); // recherche différée pendant la frappe
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const toggleSuspend = async (u) => {
+    setBusyId(u.id);
+    try {
+      await fetch(`${API_BASE}/api/admin/users/${u.id}/${u.suspended ? "reactivate" : "suspend"}`, {
+        method: "POST",
+        headers: { "x-admin-key": adminKey },
+      });
+      setUsers((list) => list.map((x) => (x.id === u.id ? { ...x, suspended: u.suspended ? 0 : 1 } : x)));
+    } catch {
+      setError("Impossible d'enregistrer ce changement. Réessaie.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!confirmDelete) return;
+    const u = confirmDelete;
+    setBusyId(u.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${u.id}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey },
+      });
+      if (!res.ok) throw new Error("La suppression a échoué.");
+      setUsers((list) => list.filter((x) => x.id !== u.id));
+      setConfirmDelete(null);
+    } catch {
+      setError("Impossible de supprimer ce compte. Réessaie.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 24, marginBottom: 6 }}>
+        Utilisateurs ({users.length})
+      </p>
+      <p style={{ color: "#8C7A94", fontSize: 12.5, marginBottom: 16 }}>
+        Recherche par nom ou email — suspension réversible, suppression définitive (profil, matchs, messages, signalements).
+      </p>
+      <input
+        value={search} onChange={(e) => setSearch(e.target.value)}
+        placeholder="Rechercher un nom ou un email..."
+        style={{
+          width: "100%", maxWidth: 380, padding: "10px 14px", borderRadius: 10, marginBottom: 18,
+          border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.06)", color: "#FBEFE9",
+          fontSize: 13.5, outline: "none", boxSizing: "border-box",
+        }}
+      />
+      {error && <p style={{ color: "#FF6B5B", fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
+      {loading && <p style={{ color: "#B39FBF" }}>Chargement...</p>}
+      {!loading && users.length === 0 && <p style={{ color: "#B39FBF" }}>Aucun compte trouvé.</p>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {users.map((u) => (
+          <div key={u.id} style={{
+            background: "#2A1B33", borderRadius: 14, padding: "14px 16px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+            opacity: u.suspended ? 0.6 : 1,
+          }}>
+            <div style={{ minWidth: 200 }}>
+              <p style={{ color: "#FBEFE9", fontWeight: 600, fontSize: 14, margin: 0 }}>
+                {u.name} <span style={{ color: "#8C7A94", fontWeight: 400, fontSize: 12.5 }}>({u.email})</span>
+              </p>
+              <p style={{ color: "#8C7A94", fontSize: 11.5, marginTop: 4 }}>
+                {[u.city, u.genre, u.plan].filter(Boolean).join(" · ")}
+                {u.created_at ? ` · inscrit le ${new Date(u.created_at).toLocaleDateString("fr-FR")}` : ""}
+              </p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {u.suspended ? (
+                <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, background: "rgba(255,107,91,0.15)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)" }}>Suspendu</span>
+              ) : (
+                <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, background: "rgba(79,168,255,0.12)", color: "#A78BFA", border: "1px solid rgba(79,168,255,0.35)" }}>Actif</span>
+              )}
+              <button onClick={() => toggleSuspend(u)} disabled={busyId === u.id} style={{
+                padding: "8px 14px", borderRadius: 10, cursor: "pointer", fontSize: 12.5,
+                background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+              }}>{u.suspended ? "Réactiver" : "Suspendre"}</button>
+              <button onClick={() => setConfirmDelete(u)} disabled={busyId === u.id} style={{
+                padding: "8px 14px", borderRadius: 10, cursor: "pointer", fontSize: 12.5,
+                background: "rgba(255,107,91,0.15)", color: "#FF6B5B", border: "1px solid rgba(255,107,91,0.35)",
+                display: "flex", alignItems: "center", gap: 6,
+              }}><Trash2 size={13} /> Supprimer</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {confirmDelete && (
+        <div
+          onClick={() => setConfirmDelete(null)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(10,6,14,0.75)", zIndex: 300,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#2A1B33", borderRadius: 16, padding: 24, maxWidth: 380, width: "100%",
+          }}>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 700, marginBottom: 10 }}>
+              Supprimer ce compte ?
+            </p>
+            <p style={{ color: "#C6B4C9", fontSize: 13.5, lineHeight: 1.6, marginBottom: 20 }}>
+              Le compte de <strong style={{ color: "#FBEFE9" }}>{confirmDelete.name}</strong> ({confirmDelete.email}) sera
+              supprimé définitivement, avec ses matchs, messages et signalements. Cette action est irréversible.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmDelete(null)} style={{
+                flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer", fontSize: 13,
+                background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)",
+              }}>Annuler</button>
+              <button onClick={confirmDeleteUser} disabled={busyId === confirmDelete.id} style={{
+                flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700,
+                background: "#FF6B5B", color: "#FBEFE9", border: "none",
+              }}>{busyId === confirmDelete.id ? "Suppression..." : "Supprimer définitivement"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminScreen() {
   const [adminKey, setAdminKey] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -5096,6 +5437,11 @@ function AdminScreen() {
       background: "radial-gradient(1200px 700px at 15% -10%, rgba(139,92,246,0.14), transparent 60%), radial-gradient(1000px 600px at 90% 10%, rgba(232,84,138,0.1), transparent 55%), #0A0611",
     }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+        <button onClick={() => setTab("users")} style={{
+          padding: "9px 18px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          background: tab === "users" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
+          color: tab === "users" ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.12)",
+        }}>Utilisateurs</button>
         <button onClick={() => setTab("verifications")} style={{
           padding: "9px 18px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontFamily: "Manrope, sans-serif", fontWeight: 700,
           background: tab === "verifications" ? "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)" : "rgba(255,255,255,0.06)",
@@ -5118,7 +5464,9 @@ function AdminScreen() {
         }}>Photos de profil</button>
       </div>
 
-      {tab === "gifts" ? (
+      {tab === "users" ? (
+        <UsersAdminSection adminKey={adminKey} />
+      ) : tab === "gifts" ? (
         <GiftsAdminSection adminKey={adminKey} />
       ) : tab === "moderation" ? (
         <ModerationAdminSection adminKey={adminKey} />
@@ -5141,7 +5489,7 @@ function AdminScreen() {
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ color: "#B39FBF", fontSize: 11, marginBottom: 4 }}>Photo de profil</p>
-                <img src={u.photos?.[0] || u.img} alt="Profil" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
+                <img src={firstPhotoUrl(u.photos) || u.img} alt="Profil" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 8 }} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -5274,7 +5622,7 @@ function MainApp() {
       ) : !user && preAuthStage === "onboarding" ? (
         <OnboardingScreens initialStep={onboardingStep} onDone={() => setPreAuthStage("auth")} />
       ) : !user ? (
-        <AuthScreen onAuth={setUser} onBackToOnboarding={() => { setOnboardingStep(1); setPreAuthStage("onboarding"); }} />
+        <AuthScreen onAuth={setUser} onBackToOnboarding={() => { setOnboardingStep(2); setPreAuthStage("onboarding"); }} />
       ) : viewingProfile ? (
         <ProfileDetailScreen match={viewingProfile} currentUserId={user?.id} onBack={() => setViewingProfile(null)} onMessage={() => openChat(viewingProfile)} />
       ) : activeChat ? (
