@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -1287,12 +1287,60 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
 
         {tab === "apropos" && (
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-              {p.profession && <InfoRow icon={<Settings size={15} color="#A78BFA" />} label="Profession" value={p.profession} />}
-              {p.education_level && <InfoRow icon={<Sparkles size={15} color="#A78BFA" />} label="Études" value={p.education_level} />}
-              {p.taille && <InfoRow icon={<User size={15} color="#A78BFA" />} label="Taille" value={`${p.taille} cm`} />}
-              {p.langues?.length > 0 && <InfoRow icon={<Mail size={15} color="#A78BFA" />} label="Langues" value={p.langues.join(", ")} />}
-            </div>
+            {p.intention && (
+              <ProfileInfoCard icon={<Search size={14} />} title="Je recherche">
+                <p style={{ color: "#FBEFE9", fontSize: 16, fontWeight: 800, fontFamily: "Manrope, sans-serif", margin: 0 }}>
+                  {p.intention.replace(/^\S+\s/, "")}
+                </p>
+              </ProfileInfoCard>
+            )}
+            {p.bio && (
+              <ProfileInfoCard icon={<Quote size={14} />} title="À propos de moi" showMenu>
+                <p style={{ color: "#F0E3EC", fontSize: 14, lineHeight: 1.6, margin: 0 }}>{p.bio}</p>
+              </ProfileInfoCard>
+            )}
+            {(p.distance_km != null || p.city || p.profession || p.education_level || p.taille || p.langues?.length > 0) && (
+              <ProfileInfoCard icon={<BadgeCheck size={14} />} title="L'essentiel">
+                {[
+                  p.distance_km != null && { q: "Distance", icon: <MapPin size={15} color="#A78BFA" />, v: `à ${p.distance_km} kilomètres` },
+                  p.city && { q: "Ville", icon: <MapPin size={15} color="#A78BFA" />, v: p.city },
+                  p.profession && { q: "Profession", icon: <Settings size={15} color="#A78BFA" />, v: p.profession },
+                  p.education_level && { q: "Études", icon: <GraduationCap size={15} color="#A78BFA" />, v: p.education_level },
+                  p.taille && { q: "Taille", icon: <User size={15} color="#A78BFA" />, v: `${p.taille} cm` },
+                  p.langues?.length > 0 && { q: "Langues", icon: <Mail size={15} color="#A78BFA" />, v: p.langues.join(", ") },
+                ].filter(Boolean).map((row, i, arr) => (
+                  <InfoQuestionRow key={row.q} question={row.q} icon={row.icon} value={row.v} last={i === arr.length - 1} />
+                ))}
+              </ProfileInfoCard>
+            )}
+            {LIFESTYLE_FIELDS.some((f) => p[f.key]) && (
+              <ProfileInfoCard icon={<Sparkles size={14} />} title="Mode de vie">
+                {LIFESTYLE_FIELDS.filter((f) => p[f.key]).map((f, i, arr) => (
+                  <InfoQuestionRow key={f.key} question={f.question} icon={f.icon} value={p[f.key]} last={i === arr.length - 1} />
+                ))}
+              </ProfileInfoCard>
+            )}
+            {BASICS_FIELDS.some((f) => p[f.key]) && (
+              <ProfileInfoCard icon={<MessageCircle size={14} />} title="Les bases">
+                {BASICS_FIELDS.filter((f) => p[f.key]).map((f, i, arr) => (
+                  <InfoQuestionRow key={f.key} question={f.question} icon={f.icon} value={p[f.key]} last={i === arr.length - 1} />
+                ))}
+              </ProfileInfoCard>
+            )}
+            {p.interests?.length > 0 && (
+              <ProfileInfoCard icon={<Sparkles size={14} />} title="Passions">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {p.interests.map((t2, i) => (
+                    <span key={t2} style={{
+                      padding: "8px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+                      background: i === 0 ? "linear-gradient(120deg, #FF6B5B, #E8548A)" : "rgba(255,255,255,0.08)",
+                      color: i === 0 ? "#2A0E12" : "#FBEFE9",
+                      border: i === 0 ? "none" : "1px solid rgba(255,255,255,0.14)",
+                    }}>{t2}</span>
+                  ))}
+                </div>
+              </ProfileInfoCard>
+            )}
             <PreferencesSection profile={p} />
           </>
         )}
@@ -1328,6 +1376,53 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
   );
 }
 
+// Carte de section façon Tinder : titre + icône en haut, éventuellement un "..." décoratif,
+// puis le contenu (texte, tags, ou lignes question/réponse) en dessous.
+function ProfileInfoCard({ icon, title, children, showMenu }) {
+  return (
+    <div style={{
+      marginBottom: 14, padding: "16px 16px 14px", borderRadius: 18,
+      background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#8C7A94", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {icon} {title}
+        </span>
+        {showMenu && (
+          <button type="button" style={{ background: "none", border: "none", color: "#6B5A73", cursor: "pointer", padding: 4, display: "flex" }}>
+            <MoreVertical size={16} />
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+// Une ligne "question / réponse" à l'intérieur d'une ProfileInfoCard (ex: "Alcool" -> "C'est très rare").
+function InfoQuestionRow({ question, icon, value, last }) {
+  return (
+    <div style={{ padding: "10px 0", borderBottom: last ? "none" : "1px solid rgba(255,255,255,0.07)" }}>
+      <p style={{ color: "#8C7A94", fontSize: 12.5, margin: "0 0 6px" }}>{question}</p>
+      <p style={{ display: "flex", alignItems: "center", gap: 8, color: "#FBEFE9", fontSize: 14, fontWeight: 600, margin: 0 }}>
+        {icon} {value}
+      </p>
+    </div>
+  );
+}
+// Champs "Mode de vie" affichés uniquement si la personne les a renseignés.
+const LIFESTYLE_FIELDS = [
+  { key: "smokes", question: "À quelle fréquence tu fumes ?", icon: <Cigarette size={15} color="#A78BFA" /> },
+  { key: "drinks_alcohol", question: "Alcool", icon: <Wine size={15} color="#A78BFA" /> },
+  { key: "does_sport", question: "Sport", icon: <Dumbbell size={15} color="#A78BFA" /> },
+  { key: "has_pets", question: "Animal de compagnie", icon: <PawPrint size={15} color="#A78BFA" /> },
+];
+// Champs "Les bases" affichés uniquement si renseignés.
+const BASICS_FIELDS = [
+  { key: "love_language", question: "Langage de l'amour", icon: <Heart size={15} color="#A78BFA" /> },
+  { key: "communication_style", question: "Communication", icon: <MessageCircle size={15} color="#A78BFA" /> },
+  { key: "astro_sign", question: "Signe astrologique", icon: <Moon size={15} color="#A78BFA" /> },
+  { key: "religion", question: "Religion", icon: <Sparkles size={15} color="#A78BFA" /> },
+];
 function InfoRow({ icon, label, value }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2624,6 +2719,8 @@ const EXTRA_INFO_FIELDS = [
   { key: "doesSport", emoji: "🏋️", label: "Sport", options: ["Jamais", "Parfois", "Régulièrement"] },
   { key: "religion", emoji: "🙏", label: "Religion", optional: true, options: ["Chrétien(ne)", "Musulman(e)", "Autre", "Sans religion", "Préfère ne pas dire"] },
   { key: "astroSign", emoji: "✨", label: "Signe astrologique", optional: true, options: ["Bélier", "Taureau", "Gémeaux", "Cancer", "Lion", "Vierge", "Balance", "Scorpion", "Sagittaire", "Capricorne", "Verseau", "Poissons"] },
+  { key: "loveLanguage", emoji: "💌", label: "Langage de l'amour", optional: true, options: ["Par des mots doux", "Par des gestes de service", "Par des cadeaux", "Par du temps passé ensemble", "Par le contact physique"] },
+  { key: "communicationStyle", emoji: "💬", label: "Communication", optional: true, options: ["Texto", "Appel", "En personne", "Un mélange des trois"] },
 ];
 
 function ProfileSettingsModal({ extraInfo, extraInfoSaving, updateExtraInfo, onClose }) {
@@ -2756,7 +2853,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [extraInfo, setExtraInfo] = useState({
     wantsMarriage: "", wantsChildren: "", educationLevel: "", hasPets: "", drinksAlcohol: "", smokes: "", doesSport: "",
-    religion: "", astroSign: "",
+    religion: "", astroSign: "", loveLanguage: "", communicationStyle: "",
   });
   const [verificationStatus, setVerificationStatus] = useState("none");
   const [userPlan, setUserPlan] = useState("free");
@@ -2827,6 +2924,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
             doesSport: data.user.does_sport || "",
             religion: data.user.religion || "",
             astroSign: data.user.astro_sign || "",
+            loveLanguage: data.user.love_language || "",
+            communicationStyle: data.user.communication_style || "",
           });
           setVerificationStatus(data.user.verification_status || "none");
           setUserPlan(data.user.plan || "free");
