@@ -469,15 +469,21 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
   );
 }
 
+// distance: 0 = pas de limite (le deck montre les profils de la ville de l'utilisateur ET du monde
+// entier, triés du plus proche au plus lointain) — c'est le comportement voulu par défaut, comme
+// ça personne n'est caché à cause d'un filtre de distance qu'il n'a pas choisi lui-même.
 const DEFAULT_FILTERS = {
-  genre: "Tous", ageMin: 18, ageMax: 45, distance: 50, intention: "Toutes",
+  genre: "Tous", ageMin: 18, ageMax: 45, distance: 0, intention: "Toutes",
   verifiedOnly: false, langue: "", tailleMin: "", tailleMax: "", commonInterests: false, pays: "", ville: "",
 };
 // Les filtres de découverte sont mémorisés sur cet appareil (comme sur Tinder/Facebook) :
 // une fois enregistrés, ils restent actifs même après avoir changé d'onglet, fermé
 // l'application ou l'avoir rouverte plus tard — jusqu'à ce que l'utilisateur les change lui-même.
+// Clé en "v2" : l'ancien défaut limitait la distance à 50 km sans que l'utilisateur l'ait choisi ;
+// on réinitialise donc une fois les réglages mémorisés pour que tout le monde reparte avec le
+// nouveau défaut "monde entier" plutôt que de rester bloqué sur l'ancienne limite silencieuse.
 function getFiltersStorageKey(userId) {
-  return `lovinia_filters_${userId || "guest"}`;
+  return `lovinia_filters_v2_${userId || "guest"}`;
 }
 function loadStoredFilters(userId) {
   try {
@@ -490,6 +496,19 @@ function loadStoredFilters(userId) {
   } catch {
     return DEFAULT_FILTERS;
   }
+}
+// Message honnête et engageant affiché quand le deck est vide : il précise la zone réellement
+// épuisée (ville filtrée, pays filtré, ou "tout le monde" si aucun des deux n'est choisi) plutôt
+// qu'un message générique — et rappelle que de nouveaux profils arrivent chaque jour, pour donner
+// envie de revenir au lieu de laisser croire que l'appli est vide pour de bon.
+function emptyDeckMessage(filters) {
+  if (filters?.ville?.trim()) {
+    return `Tu as vu tout le monde à ${filters.ville.trim()} pour l'instant — reviens demain, de nouveaux profils arrivent chaque jour.`;
+  }
+  if (filters?.pays?.trim()) {
+    return `Tu as vu tout le monde en ${filters.pays.trim()} pour l'instant — reviens demain, de nouveaux profils arrivent chaque jour.`;
+  }
+  return "Tu as vu tout le monde de disponible pour l'instant — reviens demain, de nouveaux profils arrivent chaque jour.";
 }
 function saveStoredFilters(userId, filters) {
   try {
@@ -562,9 +581,11 @@ function FiltersPanel({ filters, onApply, onClose }) {
 
       <div style={{ marginBottom: 22 }}>
         <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          Distance max : {draft.distance} km
+          Distance max : {draft.distance === 0 ? "Monde entier (illimité)" : `${draft.distance} km`}
         </label>
-        <input type="range" min={1} max={100} value={draft.distance}
+        {/* 0 = illimité (aucun filtre de distance envoyé) : c'est le réglage tout à gauche, pour
+            que "voir le monde entier" reste l'option la plus simple à choisir. */}
+        <input type="range" min={0} max={100} value={draft.distance}
           onChange={(e) => set("distance", Number(e.target.value))}
           style={{ width: "100%", marginTop: 8, accentColor: "#FF6B5B" }} />
       </div>
@@ -934,9 +955,9 @@ function DiscoverScreen({ onNewMatch, userId }) {
             alignItems: "center", justifyContent: "center", color: "#D8C4D0", textAlign: "center", gap: 8,
           }}>
             <Heart size={36} color="#FF6B5B" />
-            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 19, color: "#FBEFE9" }}>Plus personne à découvrir</p>
-            <p style={{ fontSize: 13, maxWidth: 220 }}>
-              {API_BASE ? "Invite d'autres personnes à s'inscrire pour voir plus de profils." : "Reviens plus tard pour voir de nouveaux profils près de toi."}
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: 19, color: "#FBEFE9" }}>Plus personne à découvrir pour l'instant</p>
+            <p style={{ fontSize: 13, maxWidth: 260 }}>
+              {API_BASE ? emptyDeckMessage(filters) : "Reviens plus tard pour voir de nouveaux profils près de toi."}
             </p>
           </div>
         )}
