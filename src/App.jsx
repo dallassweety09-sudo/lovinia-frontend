@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap, ShieldCheck, DollarSign } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, ChevronDown, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap, ShieldCheck, DollarSign } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -310,7 +310,7 @@ const menuBtnStyle = {
   background: "none", border: "none", color: "#FBEFE9", fontSize: 14, cursor: "pointer", textAlign: "left",
 };
 
-function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferences }) {
+function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked }) {
   const cardRef = useRef(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const start = useRef({ x: 0, y: 0 });
@@ -358,13 +358,6 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
   return (
     <div
       ref={cardRef}
-      onMouseDown={(e) => handleDown(e.clientX, e.clientY)}
-      onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
-      onMouseUp={handleUp}
-      onMouseLeave={() => isTop && drag.active && handleUp()}
-      onTouchStart={(e) => handleDown(e.touches[0].clientX, e.touches[0].clientY)}
-      onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
-      onTouchEnd={handleUp}
       style={{
         position: "absolute",
         inset: 0,
@@ -373,98 +366,105 @@ function SwipeCard({ profile, onSwipe, isTop, zIndex, onBlocked, onShowPreferenc
         boxShadow: "0 20px 40px rgba(20,8,28,0.45)",
         transform: `translate(${drag.x}px, ${drag.y}px) rotate(${rotate}deg)`,
         transition: drag.active ? "none" : "transform 0.35s cubic-bezier(.2,.8,.2,1)",
-        cursor: isTop ? "grab" : "default",
         zIndex,
-        userSelect: "none",
-        touchAction: "none",
+        display: "flex",
+        flexDirection: "column",
+        background: "#1B1223",
       }}
     >
-      {currentItem && isVideoMedia(currentItem) ? (
-        <video key={photoIndex} src={currentItem.url} autoPlay muted loop playsInline
-          style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
-      ) : (
-        <img src={currentPhoto} alt={profile.name} draggable={false}
-          style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
-      )}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "linear-gradient(to top, rgba(27,18,35,0.92) 0%, rgba(27,18,35,0.35) 45%, rgba(27,18,35,0) 65%)",
-      }} />
-      {photos.length > 1 && (
-        <div style={{ position: "absolute", top: 10, left: 10, right: 10, display: "flex", gap: 4 }}>
-          {photos.map((_, i) => (
-            <div key={i} style={{
-              flex: 1, height: 3, borderRadius: 2,
-              background: i === photoIndex ? "#FBEFE9" : "rgba(255,255,255,0.35)",
-            }} />
-          ))}
-        </div>
-      )}
-      {profile.intention ? (
-        <div style={{
-          position: "absolute", top: photos.length > 1 ? 24 : 16, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(27,18,35,0.75)", border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 999, padding: "5px 14px", color: "#FBEFE9", fontSize: 12, fontWeight: 600,
-          backdropFilter: "blur(4px)", whiteSpace: "nowrap",
-        }}>{profile.intention}</div>
-      ) : null}
-      {isTop && (
-        <div style={{ position: "absolute", top: photos.length > 1 ? 22 : 14, right: 14, zIndex: 5 }}>
-          <ReportBlockMenu targetId={profile.id} targetName={profile.name} onBlocked={() => onBlocked?.(profile.id)} />
-        </div>
-      )}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "20px 22px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 30, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
-          <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 22, color: "#E7D4E0" }}>{profile.age}</span>
-          {profile.verification_status === "verified" && <BadgeCheck size={20} color="#A78BFA" fill="#1B1223" />}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13, flexWrap: "wrap" }}>
-          <MapPin size={13} />
-          {profile.city}
-          {profile.distance_km != null ? ` · à ${profile.distance_km} km` : ""}
-          {profile.profession ? ` · ${profile.profession}` : ""}
-        </div>
-        <p style={{
-          marginTop: 10, color: "#F0E3EC", fontSize: 14, lineHeight: 1.5, maxWidth: 320,
-          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-        }}>{profile.bio}</p>
-        <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
-          {(profile.interests?.length ? profile.interests : profile.tags || []).slice(0, 5).map((t) => (
-            <span key={t} style={{
-              fontSize: 12, padding: "5px 11px", borderRadius: 999,
-              background: "rgba(255,255,255,0.14)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.2)",
-            }}>{t}</span>
-          ))}
-          {(profile.interests?.length ? profile.interests : profile.tags || []).length > 5 && (
-            <span style={{
-              fontSize: 12, padding: "5px 11px", borderRadius: 999,
-              background: "rgba(255,255,255,0.08)", color: "#D8C4D0", border: "1px solid rgba(255,255,255,0.2)",
-            }}>+{(profile.interests?.length ? profile.interests : profile.tags || []).length - 5}</span>
-          )}
-        </div>
-        {isTop && PREFERENCE_DISPLAY_FIELDS.some((f) => profile?.[f.key]) && (
-          <button onClick={() => onShowPreferences?.(profile)} style={{
-            marginTop: 12, display: "flex", alignItems: "center", gap: 6,
-            background: "linear-gradient(120deg, rgba(255,107,91,0.35), rgba(155,93,229,0.35))",
-            border: "1px solid rgba(255,255,255,0.3)", borderRadius: 999, padding: "7px 14px", color: "#FBEFE9",
-            fontSize: 12.5, fontWeight: 700, fontFamily: "Manrope, sans-serif", cursor: "pointer",
-          }}>
-            <Eye size={14} /> Voir à propos & préférences
-          </button>
+      {/* Zone photo : hauteur fixe, c'est ici (et uniquement ici) qu'on glisse pour liker/passer ou
+          qu'on tape pour changer de photo. Le reste de la fiche défile librement en dessous — plus besoin
+          de cliquer sur un bouton pour voir la description complète et tous les centres d'intérêt. */}
+      <div
+        onMouseDown={(e) => handleDown(e.clientX, e.clientY)}
+        onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
+        onMouseUp={handleUp}
+        onMouseLeave={() => isTop && drag.active && handleUp()}
+        onTouchStart={(e) => handleDown(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchEnd={handleUp}
+        style={{
+          position: "relative",
+          flex: "0 0 56%",
+          minHeight: 0,
+          cursor: isTop ? "grab" : "default",
+          userSelect: "none",
+          touchAction: "none",
+        }}
+      >
+        {currentItem && isVideoMedia(currentItem) ? (
+          <video key={photoIndex} src={currentItem.url} autoPlay muted loop playsInline
+            style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+        ) : (
+          <img src={currentPhoto} alt={profile.name} draggable={false}
+            style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
         )}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(to top, rgba(27,18,35,0.9) 0%, rgba(27,18,35,0.25) 55%, rgba(27,18,35,0) 75%)",
+        }} />
+        {photos.length > 1 && (
+          <div style={{ position: "absolute", top: 10, left: 10, right: 10, display: "flex", gap: 4 }}>
+            {photos.map((_, i) => (
+              <div key={i} style={{
+                flex: 1, height: 3, borderRadius: 2,
+                background: i === photoIndex ? "#FBEFE9" : "rgba(255,255,255,0.35)",
+              }} />
+            ))}
+          </div>
+        )}
+        {profile.intention ? (
+          <div style={{
+            position: "absolute", top: photos.length > 1 ? 24 : 16, left: "50%", transform: "translateX(-50%)",
+            background: "rgba(27,18,35,0.75)", border: "1px solid rgba(255,255,255,0.2)",
+            borderRadius: 999, padding: "5px 14px", color: "#FBEFE9", fontSize: 12, fontWeight: 600,
+            backdropFilter: "blur(4px)", whiteSpace: "nowrap",
+          }}>{profile.intention}</div>
+        ) : null}
+        {isTop && (
+          <div style={{ position: "absolute", top: photos.length > 1 ? 22 : 14, right: 14, zIndex: 5 }}>
+            <ReportBlockMenu targetId={profile.id} targetName={profile.name} onBlocked={() => onBlocked?.(profile.id)} />
+          </div>
+        )}
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "16px 22px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 28, fontWeight: 600, color: "#FBEFE9" }}>{profile.name}</span>
+            <span style={{ fontFamily: "Manrope, sans-serif", fontSize: 20, color: "#E7D4E0" }}>{profile.age}</span>
+            {profile.verification_status === "verified" && <BadgeCheck size={18} color="#A78BFA" fill="#1B1223" />}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: "#D8C4D0", fontSize: 13, flexWrap: "wrap" }}>
+            <MapPin size={13} />
+            {profile.city}
+            {profile.distance_km != null ? ` · à ${profile.distance_km} km` : ""}
+            {profile.profession ? ` · ${profile.profession}` : ""}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, color: "#B39FBF", fontSize: 11 }}>
+            <ChevronDown size={13} />
+            Fais défiler pour tout voir
+          </div>
+        </div>
+
+        <div style={{
+          position: "absolute", top: 28, left: 24, padding: "6px 14px", borderRadius: 10,
+          border: "3px solid #6BE0A8", color: "#6BE0A8", fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          fontSize: 22, letterSpacing: 1, transform: "rotate(-18deg)", opacity: likeOpacity,
+        }}>LIKE</div>
+        <div style={{
+          position: "absolute", top: 28, right: 24, padding: "6px 14px", borderRadius: 10,
+          border: "3px solid #FF6B5B", color: "#FF6B5B", fontFamily: "Manrope, sans-serif", fontWeight: 700,
+          fontSize: 22, letterSpacing: 1, transform: "rotate(18deg)", opacity: passOpacity,
+        }}>PASS</div>
       </div>
 
+      {/* Zone d'informations : défile verticalement comme sur Tinder pour tout voir sans avoir à cliquer
+          sur un bouton — bio complète, tous les centres d'intérêt, puis le même détail "À propos"
+          (l'essentiel, mode de vie, les bases, préférences...) qu'une fiche de match. */}
       <div style={{
-        position: "absolute", top: 28, left: 24, padding: "6px 14px", borderRadius: 10,
-        border: "3px solid #6BE0A8", color: "#6BE0A8", fontFamily: "Manrope, sans-serif", fontWeight: 700,
-        fontSize: 22, letterSpacing: 1, transform: "rotate(-18deg)", opacity: likeOpacity,
-      }}>LIKE</div>
-      <div style={{
-        position: "absolute", top: 28, right: 24, padding: "6px 14px", borderRadius: 10,
-        border: "3px solid #FF6B5B", color: "#FF6B5B", fontFamily: "Manrope, sans-serif", fontWeight: 700,
-        fontSize: 22, letterSpacing: 1, transform: "rotate(18deg)", opacity: passOpacity,
-      }}>PASS</div>
+        flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch",
+        background: "#1B1223", padding: "16px 22px 28px",
+      }}>
+        <ProfileAboutSections p={profile} />
+      </div>
     </div>
   );
 }
@@ -692,7 +692,6 @@ function DiscoverScreen({ onNewMatch, userId }) {
   const [coins, setCoins] = useState(null);
   const [lastSwiped, setLastSwiped] = useState(null);
   const [toast, setToast] = useState("");
-  const [preferencesProfile, setPreferencesProfile] = useState(null);
 
   const loadLimits = useCallback(async () => {
     if (!API_BASE) return;
@@ -949,26 +948,8 @@ function DiscoverScreen({ onNewMatch, userId }) {
             zIndex={i}
             onSwipe={swipe}
             onBlocked={(id) => setDeck((d) => d.filter((x) => x.id !== id))}
-            onShowPreferences={setPreferencesProfile}
           />
         ))}
-        {preferencesProfile && (
-          <div onClick={() => setPreferencesProfile(null)} style={{
-            position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 60,
-            display: "flex", alignItems: "flex-end", justifyContent: "center",
-          }}>
-            <div onClick={(e) => e.stopPropagation()} style={{
-              background: "#1B1223", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 460, maxHeight: "70vh",
-              overflowY: "auto", padding: "18px 20px 28px",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 17, margin: 0 }}>{preferencesProfile.name}</p>
-                <button onClick={() => setPreferencesProfile(null)} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
-              </div>
-              <PreferencesSection profile={preferencesProfile} />
-            </div>
-          </div>
-        )}
         {spark && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -1401,66 +1382,7 @@ function ProfileDetailScreen({ match, currentUserId, onBack, onMessage }) {
 
         {tab === "galerie" && <UserPostsSection userId={p.id} currentUserId={currentUserId} />}
 
-        {tab === "apropos" && (
-          <>
-            {p.intention && (
-              <ProfileInfoCard icon={<Search size={14} />} title="Je recherche">
-                <p style={{ color: "#FBEFE9", fontSize: 16, fontWeight: 800, fontFamily: "Manrope, sans-serif", margin: 0 }}>
-                  {p.intention.replace(/^\S+\s/, "")}
-                </p>
-              </ProfileInfoCard>
-            )}
-            {p.bio && (
-              <ProfileInfoCard icon={<Quote size={14} />} title="À propos de moi" showMenu>
-                <p style={{ color: "#F0E3EC", fontSize: 14, lineHeight: 1.6, margin: 0 }}>{p.bio}</p>
-              </ProfileInfoCard>
-            )}
-            {(p.distance_km != null || p.city || p.country || p.profession || p.education_level || p.taille || p.langues?.length > 0) && (
-              <ProfileInfoCard icon={<BadgeCheck size={14} />} title="L'essentiel">
-                {[
-                  p.distance_km != null && { q: "Distance", icon: <MapPin size={15} color="#A78BFA" />, v: `à ${p.distance_km} kilomètres` },
-                  p.city && { q: "Ville", icon: <MapPin size={15} color="#A78BFA" />, v: p.city },
-                  p.country && { q: "Pays", icon: <MapPin size={15} color="#A78BFA" />, v: p.country },
-                  p.profession && { q: "Profession", icon: <Settings size={15} color="#A78BFA" />, v: p.profession },
-                  p.education_level && { q: "Études", icon: <GraduationCap size={15} color="#A78BFA" />, v: p.education_level },
-                  p.taille && { q: "Taille", icon: <User size={15} color="#A78BFA" />, v: `${p.taille} cm` },
-                  p.langues?.length > 0 && { q: "Langues", icon: <Mail size={15} color="#A78BFA" />, v: p.langues.join(", ") },
-                ].filter(Boolean).map((row, i, arr) => (
-                  <InfoQuestionRow key={row.q} question={row.q} icon={row.icon} value={row.v} last={i === arr.length - 1} />
-                ))}
-              </ProfileInfoCard>
-            )}
-            {LIFESTYLE_FIELDS.some((f) => p[f.key]) && (
-              <ProfileInfoCard icon={<Sparkles size={14} />} title="Mode de vie">
-                {LIFESTYLE_FIELDS.filter((f) => p[f.key]).map((f, i, arr) => (
-                  <InfoQuestionRow key={f.key} question={f.question} icon={f.icon} value={p[f.key]} last={i === arr.length - 1} />
-                ))}
-              </ProfileInfoCard>
-            )}
-            {BASICS_FIELDS.some((f) => p[f.key]) && (
-              <ProfileInfoCard icon={<MessageCircle size={14} />} title="Les bases">
-                {BASICS_FIELDS.filter((f) => p[f.key]).map((f, i, arr) => (
-                  <InfoQuestionRow key={f.key} question={f.question} icon={f.icon} value={p[f.key]} last={i === arr.length - 1} />
-                ))}
-              </ProfileInfoCard>
-            )}
-            {p.interests?.length > 0 && (
-              <ProfileInfoCard icon={<Sparkles size={14} />} title="Passions">
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {p.interests.map((t2, i) => (
-                    <span key={t2} style={{
-                      padding: "8px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
-                      background: i === 0 ? "linear-gradient(120deg, #FF6B5B, #E8548A)" : "rgba(255,255,255,0.08)",
-                      color: i === 0 ? "#2A0E12" : "#FBEFE9",
-                      border: i === 0 ? "none" : "1px solid rgba(255,255,255,0.14)",
-                    }}>{t2}</span>
-                  ))}
-                </div>
-              </ProfileInfoCard>
-            )}
-            <PreferencesSection profile={p} />
-          </>
-        )}
+        {tab === "apropos" && <ProfileAboutSections p={p} />}
 
         {tab === "compat" && (
           <>
@@ -1540,6 +1462,73 @@ const BASICS_FIELDS = [
   { key: "astro_sign", question: "Signe astrologique", icon: <Moon size={15} color="#A78BFA" /> },
   { key: "religion", question: "Religion", icon: <Sparkles size={15} color="#A78BFA" /> },
 ];
+// Bloc réutilisable "À propos" façon Tinder — Je recherche / À propos de moi / L'essentiel /
+// Mode de vie / Les bases / Passions / Préférences. Utilisé à la fois sur la fiche d'un match
+// (ProfileDetailScreen, onglet "À propos") et directement dans la carte de découverte (SwipeCard),
+// pour qu'on puisse tout lire d'un profil en défilant, sans avoir à cliquer sur un bouton.
+function ProfileAboutSections({ p }) {
+  return (
+    <>
+      {p.intention && (
+        <ProfileInfoCard icon={<Search size={14} />} title="Je recherche">
+          <p style={{ color: "#FBEFE9", fontSize: 16, fontWeight: 800, fontFamily: "Manrope, sans-serif", margin: 0 }}>
+            {p.intention.replace(/^\S+\s/, "")}
+          </p>
+        </ProfileInfoCard>
+      )}
+      {p.bio && (
+        <ProfileInfoCard icon={<Quote size={14} />} title="À propos de moi" showMenu>
+          <p style={{ color: "#F0E3EC", fontSize: 14, lineHeight: 1.6, margin: 0 }}>{p.bio}</p>
+        </ProfileInfoCard>
+      )}
+      {(p.distance_km != null || p.city || p.country || p.profession || p.education_level || p.taille || p.langues?.length > 0) && (
+        <ProfileInfoCard icon={<BadgeCheck size={14} />} title="L'essentiel">
+          {[
+            p.distance_km != null && { q: "Distance", icon: <MapPin size={15} color="#A78BFA" />, v: `à ${p.distance_km} kilomètres` },
+            p.city && { q: "Ville", icon: <MapPin size={15} color="#A78BFA" />, v: p.city },
+            p.country && { q: "Pays", icon: <MapPin size={15} color="#A78BFA" />, v: p.country },
+            p.profession && { q: "Profession", icon: <Settings size={15} color="#A78BFA" />, v: p.profession },
+            p.education_level && { q: "Études", icon: <GraduationCap size={15} color="#A78BFA" />, v: p.education_level },
+            p.taille && { q: "Taille", icon: <User size={15} color="#A78BFA" />, v: `${p.taille} cm` },
+            p.langues?.length > 0 && { q: "Langues", icon: <Mail size={15} color="#A78BFA" />, v: p.langues.join(", ") },
+          ].filter(Boolean).map((row, i, arr) => (
+            <InfoQuestionRow key={row.q} question={row.q} icon={row.icon} value={row.v} last={i === arr.length - 1} />
+          ))}
+        </ProfileInfoCard>
+      )}
+      {LIFESTYLE_FIELDS.some((f) => p[f.key]) && (
+        <ProfileInfoCard icon={<Sparkles size={14} />} title="Mode de vie">
+          {LIFESTYLE_FIELDS.filter((f) => p[f.key]).map((f, i, arr) => (
+            <InfoQuestionRow key={f.key} question={f.question} icon={f.icon} value={p[f.key]} last={i === arr.length - 1} />
+          ))}
+        </ProfileInfoCard>
+      )}
+      {BASICS_FIELDS.some((f) => p[f.key]) && (
+        <ProfileInfoCard icon={<MessageCircle size={14} />} title="Les bases">
+          {BASICS_FIELDS.filter((f) => p[f.key]).map((f, i, arr) => (
+            <InfoQuestionRow key={f.key} question={f.question} icon={f.icon} value={p[f.key]} last={i === arr.length - 1} />
+          ))}
+        </ProfileInfoCard>
+      )}
+      {p.interests?.length > 0 && (
+        <ProfileInfoCard icon={<Sparkles size={14} />} title="Passions">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {p.interests.map((t2, i) => (
+              <span key={t2} style={{
+                padding: "8px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+                background: i === 0 ? "linear-gradient(120deg, #FF6B5B, #E8548A)" : "rgba(255,255,255,0.08)",
+                color: i === 0 ? "#2A0E12" : "#FBEFE9",
+                border: i === 0 ? "none" : "1px solid rgba(255,255,255,0.14)",
+              }}>{t2}</span>
+            ))}
+          </div>
+        </ProfileInfoCard>
+      )}
+      <PreferencesSection profile={p} />
+    </>
+  );
+}
+
 function InfoRow({ icon, label, value }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
