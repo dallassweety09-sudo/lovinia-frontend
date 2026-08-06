@@ -1989,6 +1989,7 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
   const [commentsEnabled, setCommentsEnabled] = useState(post.comments_enabled !== 0);
   const [commentsPermission, setCommentsPermission] = useState(post.comments_permission || "everyone");
   const [giftTotal, setGiftTotal] = useState(0);
+  const [coinsEarned, setCoinsEarned] = useState(post.coinsEarned ?? null);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [giftBurst, setGiftBurst] = useState(null); // icône affichée brièvement à l'envoi
   const [viewCount, setViewCount] = useState(post.viewCount || 0);
@@ -2017,6 +2018,7 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
         if (!res.ok) return; // Erreur passagère : on garde le compteur initial plutôt que de l'effacer.
         const data = await res.json();
         if (typeof data.total === "number") setGiftTotal(data.total);
+        if (typeof data.coinsEarned === "number") setCoinsEarned(data.coinsEarned);
       } catch {
         // Silencieux : on garde le compteur initial.
       }
@@ -2206,6 +2208,11 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
               <Gift size={17} /> {giftTotal}
             </span>
           )}
+          {isOwner && coinsEarned > 0 && (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#3ECF6B", fontSize: 13, fontWeight: 600 }}>
+              <Coins size={17} /> {coinsEarned}
+            </span>
+          )}
           {!isOwner && post.owner_verified && (
             <button onClick={() => setShowGiftPicker(true)} style={{
               marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, background: "rgba(242,184,75,0.15)",
@@ -2328,12 +2335,21 @@ function getVideoThumbnail(videoUrl) {
   return videoUrl.replace(/\.[a-zA-Z0-9]+(\?.*)?$/, ".jpg$1");
 }
 
-function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
+function PostsGrid({ posts, isOwner, currentUserId, onOpen, showEarnings }) {
   if (posts.length === 0) return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
       {posts.map((p) => (
         <div key={p.id} onClick={() => onOpen(p)} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 10, overflow: "hidden", cursor: "pointer", background: "#2A1B33" }}>
+          {showEarnings && p.coinsEarned > 0 && (
+            <div style={{
+              position: "absolute", top: 6, left: 6, zIndex: 2, display: "flex", alignItems: "center", gap: 3,
+              padding: "3px 7px", borderRadius: 999, fontSize: 9.5, fontWeight: 700, fontFamily: "Manrope, sans-serif",
+              background: "rgba(62,207,107,0.9)", color: "#0A2412",
+            }}>
+              <Coins size={9} /> {p.coinsEarned}
+            </div>
+          )}
           {p.locked ? (
             <div style={{
               width: "100%", height: "100%",
@@ -2383,24 +2399,35 @@ function PostsGrid({ posts, isOwner, currentUserId, onOpen }) {
   );
 }
 
-// Section "Mes publications" affichée dans l'écran Profil du propriétaire du compte.
-function MyPostsSection({ currentUserId, userPlan }) {
+// Écran "Contenu monétisé" — page dédiée (plein écran) accessible depuis la carte du même nom sur
+// le profil. Gratuit pour tout le monde (aucun Pack requis) : publier une photo ou une courte
+// vidéo (30 secondes max), voir ses publications, likes, commentaires, cadeaux reçus, et les Coins
+// gagnés grâce à chaque publication. Les gains sont crédités sur creator_balance et retirables via
+// le même flux que l'ancien tableau de bord créateur, désormais ouvert à tous.
+const MONETIZED_VIDEO_MAX_DURATION = 30.5; // tolérance légère au-delà des 30 secondes annoncées
+
+function MonetizedContentScreen({ currentUserId, onBack }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(!!API_BASE);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [openPost, setOpenPost] = useState(null);
-  const [nextIsPrivate, setNextIsPrivate] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [showWithdraw, setShowWithdraw] = useState(false);
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
-  const canGoPrivate = userPlan === "gold" || userPlan === "vip";
 
   const load = async () => {
     if (!API_BASE) { setLoading(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/api/posts/mine`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
-      const data = await res.json();
-      setPosts(data.posts || []);
+      const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+      const [postsRes, summaryRes] = await Promise.all([
+        fetch(`${API_BASE}/api/posts/mine`, { headers }),
+        fetch(`${API_BASE}/api/me/monetized-summary`, { headers }),
+      ]);
+      const postsData = await postsRes.json();
+      setPosts(postsData.posts || []);
+      if (summaryRes.ok) setSummary(await summaryRes.json());
     } catch {
       setPosts([]);
     } finally {
@@ -2410,28 +2437,15 @@ function MyPostsSection({ currentUserId, userPlan }) {
 
   useEffect(() => { load(); }, []);
 
-  // Lit la durée d'un fichier vidéo côté navigateur, avant même de l'envoyer vers Cloudinary.
-  const getVideoDuration = (file) =>
-    new Promise((resolve, reject) => {
-      const videoEl = document.createElement("video");
-      videoEl.preload = "metadata";
-      videoEl.onloadedmetadata = () => {
-        URL.revokeObjectURL(videoEl.src);
-        resolve(videoEl.duration);
-      };
-      videoEl.onerror = () => reject(new Error("Impossible de lire cette vidéo."));
-      videoEl.src = URL.createObjectURL(file);
-    });
-
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
     if (file.type.startsWith("video/")) {
       try {
-        const duration = await getVideoDuration(file);
-        if (duration > 10.5) {
-          setError(`Cette vidéo dure ${Math.round(duration)} secondes. Les vidéos sont limitées à 10 secondes maximum.`);
+        const duration = await readVideoDuration(file);
+        if (duration > MONETIZED_VIDEO_MAX_DURATION) {
+          setError(`Cette vidéo dure ${Math.round(duration)} secondes. Les vidéos sont limitées à 30 secondes maximum.`);
           if (photoInputRef.current) photoInputRef.current.value = "";
           if (videoInputRef.current) videoInputRef.current.value = "";
           return;
@@ -2447,13 +2461,14 @@ function MyPostsSection({ currentUserId, userPlan }) {
         const res = await fetch(`${API_BASE}/api/posts`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-          body: JSON.stringify({ mediaUrl: url, mediaType, isPrivate: canGoPrivate && nextIsPrivate }),
+          body: JSON.stringify({ mediaUrl: url, mediaType, monetized: true }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Échec de la publication.");
-        setPosts((p) => [data.post, ...p]);
+        setPosts((p) => [{ ...data.post, coinsEarned: 0 }, ...p]);
+        setSummary((s) => (s ? { ...s, postCount: s.postCount + 1 } : s));
       } else {
-        setPosts((p) => [{ id: Date.now(), media_url: url, media_type: mediaType, likeCount: 0, commentCount: 0, comments_enabled: 1, comments_permission: "everyone" }, ...p]);
+        setPosts((p) => [{ id: Date.now(), media_url: url, media_type: mediaType, likeCount: 0, commentCount: 0, coinsEarned: 0, comments_enabled: 1, comments_permission: "everyone" }, ...p]);
       }
     } catch (err) {
       setError(err.message || "Échec de l'envoi.");
@@ -2465,56 +2480,65 @@ function MyPostsSection({ currentUserId, userPlan }) {
   };
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes publications</label>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => photoInputRef.current?.click()} disabled={uploading} style={{
-            display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
-          }}>
-            <Camera size={13} /> {uploading ? "Envoi..." : "Photo"}
-          </button>
-          <button onClick={() => videoInputRef.current?.click()} disabled={uploading} style={{
-            display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-            borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
-          }}>
-            <Video size={13} /> {uploading ? "Envoi..." : "Vidéo"}
-          </button>
+    <div style={{ position: "fixed", inset: 0, zIndex: 250, background: "#1B1223", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 18px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#FBEFE9", cursor: "pointer", display: "flex", padding: 0 }}>
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 17, margin: 0 }}>Contenu monétisé</p>
+          <p style={{ color: "#8C7A94", fontSize: 11.5, margin: 0 }}>Gratuit — gagne des Coins grâce aux cadeaux de la communauté.</p>
         </div>
-        <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
-        <input ref={videoInputRef} type="file" accept="video/*" onChange={handleFile} style={{ display: "none" }} />
       </div>
 
-      {canGoPrivate ? (
-        <button onClick={() => setNextIsPrivate((v) => !v)} style={{
-          display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "8px 12px", borderRadius: 12,
-          background: nextIsPrivate ? "rgba(155,93,229,0.15)" : "rgba(255,255,255,0.05)",
-          border: `1px solid ${nextIsPrivate ? "rgba(155,93,229,0.4)" : "rgba(255,255,255,0.1)"}`, cursor: "pointer", width: "100%",
+      <div style={{ flex: 1, overflowY: "auto", padding: 18 }}>
+        <div style={{
+          background: "linear-gradient(120deg, rgba(62,207,107,0.14), rgba(62,207,107,0.04))",
+          border: "1px solid rgba(62,207,107,0.3)", borderRadius: 18, padding: 18, marginBottom: 22,
         }}>
-          <div style={{
-            width: 34, height: 19, borderRadius: 999, background: nextIsPrivate ? "#9B5DE5" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s", flexShrink: 0,
-          }}>
-            <div style={{ width: 14, height: 14, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: nextIsPrivate ? 17 : 2.5, transition: "left 0.2s" }} />
+          <p style={{ color: "#8C7A94", fontSize: 12, marginBottom: 6 }}>Coins gagnés au total</p>
+          <p style={{ color: "#3ECF6B", fontFamily: "Manrope, sans-serif", fontSize: 30, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Coins size={24} /> {summary ? summary.coinsEarned : "..."}
+          </p>
+          <div style={{ display: "flex", gap: 18, marginTop: 12 }}>
+            <span style={{ color: "#D8C4D0", fontSize: 12 }}>{summary?.postCount ?? 0} publication{(summary?.postCount ?? 0) > 1 ? "s" : ""}</span>
+            <span style={{ color: "#D8C4D0", fontSize: 12 }}>{summary?.giftCount ?? 0} cadeau{(summary?.giftCount ?? 0) > 1 ? "x" : ""} reçu{(summary?.giftCount ?? 0) > 1 ? "s" : ""}</span>
           </div>
-          <span style={{ color: "#FBEFE9", fontSize: 12.5, fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>
-            {nextIsPrivate ? "🔒 La prochaine publication sera privée" : "🌍 La prochaine publication sera publique"}
-          </span>
-        </button>
-      ) : (
-        <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
-          <Lock size={11} /> Le Pack Gold permet de publier du contenu privé (cadeaux + gains).
-        </p>
-      )}
-      <p style={{ color: "#6B5A73", fontSize: 11, marginTop: 4 }}>Photos, ou vidéos de 10 secondes maximum. Likes, commentaires et cadeaux fonctionnent sur les deux.</p>
-      {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{error}</p>}
-      <div style={{ marginTop: 10 }}>
+          <button onClick={() => setShowWithdraw(true)} style={{
+            marginTop: 14, width: "100%", padding: "10px 0", borderRadius: 12, cursor: "pointer",
+            background: "#3ECF6B", border: "none", color: "#0A2412", fontWeight: 700, fontSize: 13,
+          }}>Retirer mes gains</button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Mes publications</label>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => photoInputRef.current?.click()} disabled={uploading} style={{
+              display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
+            }}>
+              <Camera size={13} /> {uploading ? "Envoi..." : "Photo"}
+            </button>
+            <button onClick={() => videoInputRef.current?.click()} disabled={uploading} style={{
+              display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 10, padding: "5px 10px", color: "#FBEFE9", fontSize: 11.5, cursor: uploading ? "default" : "pointer",
+            }}>
+              <Video size={13} /> {uploading ? "Envoi..." : "Vidéo"}
+            </button>
+          </div>
+          <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
+          <input ref={videoInputRef} type="file" accept="video/*" onChange={handleFile} style={{ display: "none" }} />
+        </div>
+        <p style={{ color: "#6B5A73", fontSize: 11, marginBottom: 10 }}>Photos, ou vidéos de 30 secondes maximum. Toutes reçoivent likes, commentaires et cadeaux.</p>
+        {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginBottom: 10 }}>{error}</p>}
+
         {loading && <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Chargement...</p>}
         {!loading && posts.length === 0 && (
-          <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucune publication pour l'instant. Ajoute une photo ou une vidéo !</p>
+          <p style={{ color: "#8C7A94", fontSize: 12.5 }}>Aucune publication pour l'instant. Ajoute une photo ou une vidéo pour commencer à gagner des Coins !</p>
         )}
-        <PostsGrid posts={posts} isOwner currentUserId={currentUserId} onOpen={setOpenPost} />
+        <PostsGrid posts={posts} isOwner currentUserId={currentUserId} onOpen={setOpenPost} showEarnings />
       </div>
+
       {openPost && (
         <PostDetailModal
           post={openPost} isOwner currentUserId={currentUserId}
@@ -2523,6 +2547,7 @@ function MyPostsSection({ currentUserId, userPlan }) {
           onUpdated={(id, patch) => setPosts((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)))}
         />
       )}
+      {showWithdraw && <CreatorDashboardModal onClose={() => { setShowWithdraw(false); load(); }} />}
     </div>
   );
 }
@@ -2574,7 +2599,7 @@ const SUBSCRIPTION_PLAN_STYLE = {
 };
 
 const FALLBACK_PLANS = {
-  gold: { name: "Pack Gold", priceUSD: 5, features: ["Publier des photos et vidéos privées", "Interrupteur Public/Privé sur chaque contenu", "Gestion des contenus privés depuis le profil", "Statistiques des contenus privés", "Réception de cadeaux sur les contenus privés", "Demande de retrait des gains"] },
+  gold: { name: "Pack Gold", priceUSD: 5, priceXAF: 3000, features: ["Badge Gold sur le profil", "Support client prioritaire"] },
   premium: { name: "Pack Premium", priceUSD: 10, features: ["Matchs illimités", "Mise en avant du profil", "Voir qui a aimé ton profil", "Filtres avancés", "Priorité dans les recherches", "Boost du profil", "Plus de Super Likes", "Badge Premium", "Réduction sur les LoviCoins", "Statistiques détaillées"] },
   vip: { name: "Pack VIP", priceUSD: 15, features: ["Tous les avantages Premium", "Consultation des photos et vidéos privées", "Accès aux contenus réservés VIP", "Cadeaux VIP exclusifs", "Bonus mensuel de LoviCoins", "Badge VIP animé", "Visibilité maximale", "Service client prioritaire"] },
 };
@@ -3073,12 +3098,11 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [primaryPhotoStatus, setPrimaryPhotoStatus] = useState("approved");
   const [resendStatus, setResendStatus] = useState("idle"); // "idle" | "sending" | "sent" | "error"
   const [legalOpen, setLegalOpen] = useState(null);
-  const [showMyPosts, setShowMyPosts] = useState(false);
+  const [showMonetizedContent, setShowMonetizedContent] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [profileTab, setProfileTab] = useState("profil"); // "profil" | "galerie" | "apropos" | "verif"
   const [showSubscriptions, setShowSubscriptions] = useState(false);
-  const [showCreatorDashboard, setShowCreatorDashboard] = useState(false);
   const [acceptGifts, setAcceptGifts] = useState(true);
   const [giftSendersRestriction, setGiftSendersRestriction] = useState("everyone");
   const [hideGiftCount, setHideGiftCount] = useState(false);
@@ -3548,16 +3572,6 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           <GalleryUploader photos={photos} onChange={setPhotos} />
         </div>
       </div>
-
-      <button onClick={() => setShowMyPosts((s) => !s)} style={{
-        marginTop: 20, width: "100%", padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-        color: "#FBEFE9", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Video size={16} color="#8C7A94" /> Mes publications</span>
-        <ChevronRight size={16} color="#8C7A94" style={{ transform: showMyPosts ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
-      </button>
-      {showMyPosts && <MyPostsSection currentUserId={user?.id} userPlan={userPlan} />}
       </>
       )}
 
@@ -3626,9 +3640,9 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {[
           { onClick: () => setShowVisitors(true), icon: <Eye size={19} color="#FF6B5B" />, iconBg: "rgba(255,107,91,0.18)", title: "Qui a visité mon profil", desc: "Vois qui s'intéresse à toi." },
-          { onClick: () => setShowSubscriptions(true), icon: <Crown size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Abonnements", desc: userPlan !== "free" ? `Pack ${SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan} actif` : "Premium, VIP, Super VIP." },
           { onClick: () => setShowWallet(true), icon: <Wallet size={19} color="#F2B84B" />, iconBg: "rgba(242,184,75,0.18)", title: "Mon portefeuille", desc: "Solde, recharge, historique." },
-          ...(userPlan === "gold" || userPlan === "vip" ? [{ onClick: () => setShowCreatorDashboard(true), icon: <Gem size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Tableau de bord créateur", desc: "Gains, retraits, statistiques." }] : []),
+          { onClick: () => setShowSubscriptions(true), icon: <Crown size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Abonnements", desc: userPlan !== "free" ? `Pack ${SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan} actif` : "Gold, Premium, VIP." },
+          { onClick: () => setShowMonetizedContent(true), icon: <Gem size={19} color="#3ECF6B" />, iconBg: "rgba(62,207,107,0.18)", title: "Contenu monétisé", desc: "Publie et gagne des Coins, gratuit." },
         ].map((card) => (
           <button key={card.title} onClick={card.onClick} style={{
             display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 16, cursor: "pointer",
@@ -3709,7 +3723,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {showVisitors && <VisitorsModal onClose={() => setShowVisitors(false)} />}
       {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
       {showSubscriptions && <SubscriptionsModal currentPlan={userPlan} onClose={() => setShowSubscriptions(false)} onSubscribed={(p) => setUserPlan(p)} />}
-      {showCreatorDashboard && <CreatorDashboardModal onClose={() => setShowCreatorDashboard(false)} />}
+      {showMonetizedContent && <MonetizedContentScreen currentUserId={user?.id} onBack={() => setShowMonetizedContent(false)} />}
 
       <button onClick={handleLogoutClick} disabled={loggingOut} style={{
         marginTop: 16, width: "100%", padding: "13px 0", borderRadius: 999, cursor: loggingOut ? "default" : "pointer",
