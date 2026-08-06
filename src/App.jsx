@@ -2585,18 +2585,27 @@ function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
   const [subscribingTo, setSubscribingTo] = useState(null);
   const [error, setError] = useState("");
   const [successPlan, setSuccessPlan] = useState(null);
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
 
   useEffect(() => {
     if (!API_BASE) return;
     (async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/api/plans`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.plans) setPlans(data.plans);
+        const [plansRes, configRes] = await Promise.all([
+          fetch(`${API_BASE}/api/plans`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/api/payments/config`),
+        ]);
+        if (plansRes.ok) {
+          const data = await plansRes.json();
+          if (data.plans) setPlans(data.plans);
+        }
+        if (configRes.ok) {
+          const cfg = await configRes.json();
+          setPaymentEnabled(!!cfg.enabled);
+        }
       } catch {
-        // Silencieux : on garde le catalogue de secours.
+        // Silencieux : on garde le catalogue de secours et le paiement démo.
       }
     })();
   }, []);
@@ -2612,6 +2621,18 @@ function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
     }
     try {
       const token = localStorage.getItem("token");
+      if (paymentEnabled) {
+        // Paiement réel Mobile Money : on initie la transaction puis on redirige vers la page
+        // de paiement CinetPay. L'activation du pack se fait côté serveur, après confirmation.
+        const res = await fetch(`${API_BASE}/api/payments/subscribe/init`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ plan: planKey }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Échec de l'initialisation du paiement.");
+        window.location.href = data.paymentUrl;
+        return;
+      }
       const res = await fetch(`${API_BASE}/api/subscribe`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ plan: planKey }),
@@ -2659,7 +2680,8 @@ function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
                   {isCurrent && <span style={{ background: style.grad, color: "#2A0E12", fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 999, fontFamily: "Manrope, sans-serif" }}>ACTIF</span>}
                 </div>
                 <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 20, margin: "0 0 10px" }}>
-                  {plan.priceUSD} $ <span style={{ color: "#8B7A93", fontSize: 12, fontWeight: 500 }}>/ mois</span>
+                  {paymentEnabled && plan.priceXAF ? `${plan.priceXAF.toLocaleString("fr-FR")} FCFA` : `${plan.priceUSD} $`}
+                  <span style={{ color: "#8B7A93", fontSize: 12, fontWeight: 500 }}> / mois</span>
                 </p>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
@@ -2682,7 +2704,7 @@ function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
                     color: isCurrent ? "#8B7A93" : "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13.5,
                   }}
                 >
-                  {isCurrent ? "Pack actif" : subscribingTo === key ? "Activation..." : "S'abonner"}
+                  {isCurrent ? "Pack actif" : subscribingTo === key ? (paymentEnabled ? "Redirection..." : "Activation...") : paymentEnabled ? "Payer par Mobile Money" : "S'abonner"}
                 </button>
                 {successPlan === key && <p style={{ color: "#3ECF6B", fontSize: 11.5, marginTop: 8, textAlign: "center" }}>Pack {plan.name} activé ✓</p>}
               </div>
@@ -2691,7 +2713,9 @@ function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
         </div>
         {error && <p style={{ color: "#FF6B5B", fontSize: 12, padding: "0 20px 16px", textAlign: "center" }}>{error}</p>}
         <p style={{ color: "#6B5A73", fontSize: 10.5, padding: "0 20px 20px", textAlign: "center" }}>
-          Paiement de démonstration pour l'instant — le vrai paiement (carte, Mobile Money) sera bientôt disponible.
+          {paymentEnabled
+            ? "Paiement sécurisé par Mobile Money (Orange Money, MTN...) via CinetPay."
+            : "Paiement de démonstration pour l'instant — le vrai paiement (Mobile Money) sera bientôt disponible."}
         </p>
       </div>
     </div>
@@ -2894,6 +2918,10 @@ function WalletModal({ onClose }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(!!API_BASE);
   const [error, setError] = useState("");
+  const [coinPacks, setCoinPacks] = useState({});
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
+  const [buyingPack, setBuyingPack] = useState(null);
+  const [buyError, setBuyError] = useState("");
 
   const load = async () => {
     if (!API_BASE) { setLoading(false); return; }
@@ -2901,11 +2929,19 @@ function WalletModal({ onClose }) {
     setError("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/me/wallet`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const [walletRes, configRes] = await Promise.all([
+        fetch(`${API_BASE}/api/me/wallet`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/api/payments/config`),
+      ]);
+      if (!walletRes.ok) throw new Error();
+      const data = await walletRes.json();
       setCoins(data.coins ?? 0);
       setTransactions(data.transactions || []);
+      if (configRes.ok) {
+        const cfg = await configRes.json();
+        setPaymentEnabled(!!cfg.enabled);
+        setCoinPacks(cfg.coinPacks || {});
+      }
     } catch {
       setError("Impossible de charger ton portefeuille pour le moment.");
     } finally {
@@ -2914,6 +2950,24 @@ function WalletModal({ onClose }) {
   };
 
   useEffect(() => { load(); }, []);
+
+  const buyPack = async (packKey) => {
+    setBuyingPack(packKey);
+    setBuyError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/payments/coins/init`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pack: packKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'initialisation du paiement.");
+      window.location.href = data.paymentUrl;
+    } catch (e) {
+      setBuyError(e.message || "Une erreur est survenue.");
+      setBuyingPack(null);
+    }
+  };
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}>
@@ -2931,6 +2985,32 @@ function WalletModal({ onClose }) {
             <Coins size={26} /> {loading ? "..." : coins ?? 0}
           </p>
         </div>
+
+        {paymentEnabled && Object.keys(coinPacks).length > 0 && (
+          <div style={{ padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Recharger (Mobile Money)</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {Object.entries(coinPacks).map(([key, pack]) => (
+                <button
+                  key={key} onClick={() => buyPack(key)} disabled={buyingPack === key}
+                  style={{
+                    padding: "10px 8px", borderRadius: 12, cursor: buyingPack === key ? "default" : "pointer",
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(242,184,75,0.35)",
+                    color: "#FBEFE9", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 700, fontSize: 13.5 }}>
+                    <Coins size={13} color="#F2B84B" /> {pack.coins}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#8C7A94" }}>
+                    {buyingPack === key ? "Redirection..." : `${pack.priceXAF.toLocaleString("fr-FR")} FCFA`}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {buyError && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 8 }}>{buyError}</p>}
+          </div>
+        )}
 
         <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>
           <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Historique</p>
@@ -5740,11 +5820,104 @@ function VerifyEmailScreen() {
   );
 }
 
+// Page sur laquelle CinetPay redirige l'utilisateur après un paiement Mobile Money (return_url).
+// Ce n'est jamais la source de vérité (le webhook + /api/payments/status le sont), juste l'écran
+// qui informe l'utilisateur pendant qu'on confirme le paiement côté serveur.
+function PaymentReturnScreen() {
+  const [status, setStatus] = useState("checking"); // "checking" | "accepted" | "refused" | "pending" | "error"
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    const transactionId = new URLSearchParams(window.location.search).get("transaction_id");
+    if (!transactionId || !API_BASE) {
+      setStatus("error");
+      return;
+    }
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/payments/status/${transactionId}`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) { setStatus("error"); return; }
+        if (data.status === "accepted") { setStatus("accepted"); setResult(data); return; }
+        if (data.status === "refused") { setStatus("refused"); return; }
+        if (attempts >= 15) { setStatus("pending"); return; } // ~45s d'attente max avant de lâcher l'utilisateur
+        setTimeout(poll, 3000);
+      } catch {
+        if (!cancelled) setTimeout(poll, 3000);
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#1B1223", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
+      <div style={{ maxWidth: 360 }}>
+        {status === "checking" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>⏳</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Confirmation du paiement...</p>
+            <p style={{ color: "#D8C4D0", fontSize: 13.5 }}>Ne ferme pas cette page, ça ne prend que quelques secondes.</p>
+          </>
+        )}
+        {status === "accepted" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>✅</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Paiement confirmé !</p>
+            <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>
+              {result?.kind === "coins" ? `${result.coinsAmount} Coins ont été ajoutés à ton compte.` : "Ton pack a été activé."}
+            </p>
+            <a href="/" style={{ display: "inline-block", background: "#FF6B5B", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>
+              Retourner sur Lovinia
+            </a>
+          </>
+        )}
+        {status === "refused" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>❌</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Paiement refusé ou annulé</p>
+            <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>Aucun montant n'a été débité côté Lovinia. Tu peux réessayer depuis l'application.</p>
+            <a href="/" style={{ display: "inline-block", background: "rgba(255,255,255,0.08)", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14 }}>
+              Retourner sur Lovinia
+            </a>
+          </>
+        )}
+        {status === "pending" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>⏳</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Toujours en cours de traitement</p>
+            <p style={{ color: "#D8C4D0", fontSize: 13.5, marginBottom: 20 }}>Certains opérateurs Mobile Money prennent un peu plus de temps. Vérifie ton portefeuille dans quelques minutes.</p>
+            <a href="/" style={{ display: "inline-block", background: "rgba(255,255,255,0.08)", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14 }}>
+              Retourner sur Lovinia
+            </a>
+          </>
+        )}
+        {status === "error" && (
+          <>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>⚠️</p>
+            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Lien de paiement invalide</p>
+            <a href="/" style={{ display: "inline-block", background: "rgba(255,255,255,0.08)", color: "#FBEFE9", padding: "12px 24px", borderRadius: 14, textDecoration: "none", fontSize: 14 }}>
+              Retourner sur Lovinia
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DatingAppMVP() {
   const isAdminRoute = typeof window !== "undefined" && window.location.search.includes("admin=true");
   const isVerifyRoute = typeof window !== "undefined" && window.location.pathname.includes("verify-email");
   const isLegalRoute = typeof window !== "undefined" && window.location.pathname.includes("legal");
+  const isPaymentReturnRoute = typeof window !== "undefined" && window.location.pathname.includes("payment-return");
   if (isLegalRoute) return <PublicLegalScreen />;
   if (isVerifyRoute) return <VerifyEmailScreen />;
+  if (isPaymentReturnRoute) return <PaymentReturnScreen />;
   return isAdminRoute ? <AdminScreen /> : <MainApp />;
 }
