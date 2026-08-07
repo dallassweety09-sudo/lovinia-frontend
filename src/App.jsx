@@ -3164,7 +3164,635 @@ function WalletModal({ onClose }) {
   );
 }
 
-function ProfileScreen({ user, onLogout, onAccountDeleted }) {
+// ---------- Lovinia Matchmaking : service premium de mise en relation personnalisée ----------
+// Distinct du fonctionnement classique (swipe) : abonnement annuel séparé, profil de recherche
+// détaillé, et deux modes au choix — recherche autonome entre membres, ou mises en relation
+// curatées manuellement par l'équipe Lovinia. Voir server.js pour les routes /api/matchmaking/*.
+const MATCHMAKING_VALUES = [
+  "Respect", "Honnêteté", "Fidélité", "Ambition", "Bienveillance", "Humour",
+  "Spiritualité", "Famille", "Indépendance", "Communication",
+];
+const MATCHMAKING_GRAD = "linear-gradient(120deg, #A78BFA 0%, #E8548A 100%)";
+
+function MatchmakingScreen({ onBack, onOpenChat }) {
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(null);
+  const [view, setView] = useState("intro"); // 'intro' | 'mode' | 'profileForm' | 'home'
+  const [mode, setMode] = useState("autonome");
+  const [form, setForm] = useState({
+    ageMin: 25, ageMax: 45, ville: "", pays: "", situationFamiliale: "Peu importe",
+    projetCouple: "Relation sérieuse", souhaitMariage: "Peu importe", enfants: "Peu importe",
+    valeurs: [], personnaliteRecherchee: "", distanceMax: 50, autresCriteres: "",
+    contactPref: ["notification"], frequenceSouhaitee: "Régulière", visible: true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [members, setMembers] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [detailMember, setDetailMember] = useState(null);
+  const [contacting, setContacting] = useState(null);
+  const [respondingTo, setRespondingTo] = useState(null);
+
+  const load = async () => {
+    if (!API_BASE) { setLoading(false); return; }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/matchmaking/status`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setStatus(data);
+      if (data.profile) {
+        setMode(data.profile.mode || "autonome");
+        setForm({
+          ageMin: data.profile.age_min || 25, ageMax: data.profile.age_max || 45,
+          ville: data.profile.ville || "", pays: data.profile.pays || "",
+          situationFamiliale: data.profile.situation_familiale || "Peu importe",
+          projetCouple: data.profile.projet_couple || "Relation sérieuse",
+          souhaitMariage: data.profile.souhait_mariage || "Peu importe",
+          enfants: data.profile.enfants || "Peu importe",
+          valeurs: data.profile.valeurs || [],
+          personnaliteRecherchee: data.profile.personnalite_recherchee || "",
+          distanceMax: data.profile.distance_max || 50,
+          autresCriteres: data.profile.autres_criteres || "",
+          contactPref: data.profile.contact_pref?.length ? data.profile.contact_pref : ["notification"],
+          frequenceSouhaitee: data.profile.frequence_souhaitee || "Régulière",
+          visible: data.profile.visible !== 0,
+        });
+      }
+      if (data.active && data.hasProfile) setView("home");
+      else if (data.active) setView("mode");
+      else setView("intro");
+    } catch {
+      setError("Connexion au serveur impossible.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const loadMembers = async () => {
+    if (!API_BASE) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/matchmaking/members`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setMembers(data.members || []);
+    } catch {
+      setMembers([]);
+    }
+  };
+  const loadSuggestions = async () => {
+    if (!API_BASE) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/matchmaking/suggestions`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+    } catch {
+      setSuggestions([]);
+    }
+  };
+  useEffect(() => {
+    if (view !== "home") return;
+    if (mode === "autonome") loadMembers();
+    else loadSuggestions();
+  }, [view, mode]);
+
+  const saveProfile = async (token) => {
+    const res = await fetch(`${API_BASE}/api/matchmaking/profile`, {
+      method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...form, mode }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Échec de l'enregistrement du profil.");
+  };
+
+  const submitProfile = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      if (!API_BASE) {
+        setView("home");
+        return;
+      }
+      const token = localStorage.getItem("token");
+      if (!status?.active) {
+        if (status?.paymentEnabled) {
+          await saveProfile(token); // on enregistre le profil avant de rediriger vers le paiement
+          const res = await fetch(`${API_BASE}/api/payments/matchmaking/init`, {
+            method: "POST", headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Échec de l'initialisation du paiement.");
+          window.location.href = data.paymentUrl;
+          return;
+        }
+        await fetch(`${API_BASE}/api/matchmaking/subscribe`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      }
+      await saveProfile(token);
+      await load();
+    } catch (e) {
+      setError(e.message || "Une erreur est survenue.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const contactMember = async (member) => {
+    if (!API_BASE) return;
+    setContacting(member.id);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/matchmaking/contact/${member.id}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Impossible d'envoyer un message.");
+      setDetailMember(null);
+      onOpenChat?.({ matchId: data.matchId, id: member.id, name: member.name, img: member.img || member.photos?.[0]?.url || "" });
+    } catch (e) {
+      setError(e.message || "Une erreur est survenue.");
+    } finally {
+      setContacting(null);
+    }
+  };
+
+  const respondSuggestion = async (suggestion, accept) => {
+    if (!API_BASE) return;
+    setRespondingTo(suggestion.id);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/matchmaking/suggestions/${suggestion.id}/respond`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ accept }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur.");
+      if (data.matched && suggestion.profile) {
+        onOpenChat?.({ id: suggestion.profile.id, name: suggestion.profile.name, img: suggestion.profile.img });
+      }
+      await loadSuggestions();
+    } catch (e) {
+      setError(e.message || "Une erreur est survenue.");
+    } finally {
+      setRespondingTo(null);
+    }
+  };
+
+  const toggleValeur = (v) => {
+    setForm((f) => ({ ...f, valeurs: f.valeurs.includes(v) ? f.valeurs.filter((x) => x !== v) : [...f.valeurs, v] }));
+  };
+  const toggleContactPref = (v) => {
+    setForm((f) => ({ ...f, contactPref: f.contactPref.includes(v) ? f.contactPref.filter((x) => x !== v) : [...f.contactPref, v] }));
+  };
+
+  const priceLabel = status?.paymentEnabled && status?.plan?.priceXAF
+    ? `${status.plan.priceXAF.toLocaleString("fr-FR")} FCFA / an`
+    : `${status?.plan?.priceEUR ?? 50} € / an`;
+
+  const selectRowStyle = {
+    display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8,
+  };
+  const optionBtn = (active) => ({
+    padding: "8px 13px", borderRadius: 12, cursor: "pointer", fontSize: 12.5,
+    background: active ? MATCHMAKING_GRAD : "rgba(255,255,255,0.08)",
+    color: active ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontWeight: active ? 800 : 500,
+  });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 250, background: "#1B1223", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 18px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+        <button
+          onClick={() => (view === "home" || view === "intro" ? onBack() : setView(status?.active ? "home" : "intro"))}
+          style={{ background: "none", border: "none", color: "#FBEFE9", cursor: "pointer", display: "flex", padding: 0 }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 17, margin: 0 }}>Lovinia Matchmaking</p>
+          <p style={{ color: "#8C7A94", fontSize: 11.5, margin: 0 }}>Service premium de mise en relation.</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#8C7A94" }}>Chargement...</div>
+      ) : (
+        <div style={{ flex: 1, overflowY: "auto" }}>
+
+          {/* ---------- 1. Page de présentation (avant paiement) ---------- */}
+          {view === "intro" && (
+            <div style={{ padding: "26px 22px 40px", textAlign: "center" }}>
+              <div style={{
+                width: 68, height: 68, borderRadius: "50%", margin: "0 auto 18px", background: MATCHMAKING_GRAD,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Heart size={30} color="#2A0E12" fill="#2A0E12" />
+              </div>
+              <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 22, margin: "0 0 8px" }}>
+                Trouve une relation sérieuse, en toute confiance.
+              </p>
+              <p style={{ color: "#B39FBF", fontSize: 13.5, lineHeight: 1.6, maxWidth: 320, margin: "0 auto 22px" }}>
+                Vous n'avez pas envie de passer votre temps à swiper ? Indiquez-nous ce que vous recherchez
+                réellement et découvrez des personnes qui recherchent elles aussi une relation sérieuse.
+                Une année pour donner une vraie chance à une vraie rencontre.
+              </p>
+
+              <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 12, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: 18, marginBottom: 18 }}>
+                {[
+                  { icon: <ShieldCheck size={16} color="#A78BFA" />, text: "Profils vérifiés et sélectionnés" },
+                  { icon: <User size={16} color="#A78BFA" />, text: "Mise en relation personnalisée" },
+                  { icon: <Sparkles size={16} color="#A78BFA" />, text: "Choisissez votre mode : autonome ou accompagné" },
+                  { icon: <Lock size={16} color="#A78BFA" />, text: "Échanges sécurisés et privés" },
+                ].map((row) => (
+                  <div key={row.text} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {row.icon}
+                    <span style={{ color: "#F0E3EC", fontSize: 13 }}>{row.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: "16px 18px", marginBottom: 20 }}>
+                <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 22, margin: 0 }}>{priceLabel}</p>
+                <p style={{ color: "#8C7A94", fontSize: 12, margin: "4px 0 0" }}>Accès illimité au service premium pendant un an.</p>
+              </div>
+
+              <button onClick={() => setView("mode")} style={{
+                width: "100%", padding: "15px 0", borderRadius: 999, border: "none", cursor: "pointer",
+                background: MATCHMAKING_GRAD, color: "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 14.5,
+              }}>
+                Rejoindre Lovinia Matchmaking
+              </button>
+              <p style={{ color: "#6B5A73", fontSize: 10.5, marginTop: 10 }}>
+                <Lock size={10} style={{ verticalAlign: "-1px", marginRight: 4 }} />
+                Paiement sécurisé — vos données restent 100% confidentielles.
+              </p>
+            </div>
+          )}
+
+          {/* ---------- 2. Choix du mode ---------- */}
+          {view === "mode" && (
+            <div style={{ padding: "24px 22px 40px" }}>
+              <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 19, marginBottom: 6, textAlign: "center" }}>
+                Comment souhaitez-vous faire vos rencontres ?
+              </p>
+              <p style={{ color: "#8C7A94", fontSize: 12.5, textAlign: "center", marginBottom: 22 }}>
+                Vous pourrez changer de mode plus tard depuis votre profil Matchmaking.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {[
+                  { key: "autonome", icon: <User size={22} color="#A78BFA" />, title: "Je cherche moi-même", desc: "Consultez les profils des membres du service et prenez vous-même contact avec les personnes qui vous intéressent." },
+                  { key: "accompagne", icon: <Sparkles size={22} color="#A78BFA" />, title: "Je souhaite être accompagné", desc: "Lovinia utilise votre profil pour identifier des profils compatibles et vous propose des mises en relation personnalisées." },
+                ].map((opt) => (
+                  <button key={opt.key} onClick={() => { setMode(opt.key); setView("profileForm"); }} style={{
+                    textAlign: "left", padding: 18, borderRadius: 18, cursor: "pointer",
+                    background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.12)",
+                    display: "flex", flexDirection: "column", gap: 10,
+                  }}>
+                    {opt.icon}
+                    <span style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15 }}>{opt.title}</span>
+                    <span style={{ color: "#B39FBF", fontSize: 12.5, lineHeight: 1.5 }}>{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ---------- 3. Formulaire de profil de recherche + paiement ---------- */}
+          {view === "profileForm" && (
+            <div style={{ padding: "22px 22px 40px" }}>
+              <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 18, marginBottom: 4 }}>
+                Votre profil de recherche
+              </p>
+              <p style={{ color: "#8C7A94", fontSize: 12, marginBottom: 20 }}>
+                Mode choisi : <strong style={{ color: "#A78BFA" }}>{mode === "autonome" ? "Je cherche moi-même" : "Accompagné par Lovinia"}</strong>
+                {" — "}
+                <button onClick={() => setView("mode")} style={{ background: "none", border: "none", color: "#A78BFA", cursor: "pointer", padding: 0, fontSize: 12, textDecoration: "underline" }}>
+                  changer
+                </button>
+              </p>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Âge recherché : {form.ageMin} - {form.ageMax} ans
+              </label>
+              <div style={{ display: "flex", gap: 10, marginTop: 8, marginBottom: 18, alignItems: "center" }}>
+                <input type="range" min={18} max={70} value={form.ageMin}
+                  onChange={(e) => setForm((f) => ({ ...f, ageMin: Math.min(Number(e.target.value), f.ageMax) }))}
+                  style={{ flex: 1, accentColor: "#A78BFA" }} />
+                <input type="range" min={18} max={70} value={form.ageMax}
+                  onChange={(e) => setForm((f) => ({ ...f, ageMax: Math.max(Number(e.target.value), f.ageMin) }))}
+                  style={{ flex: 1, accentColor: "#A78BFA" }} />
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Distance max souhaitée : {form.distanceMax} km
+              </label>
+              <input type="range" min={5} max={200} value={form.distanceMax}
+                onChange={(e) => setForm((f) => ({ ...f, distanceMax: Number(e.target.value) }))}
+                style={{ width: "100%", marginTop: 8, marginBottom: 18, accentColor: "#A78BFA" }} />
+
+              <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Ville</label>
+                  <input value={form.ville} onChange={(e) => setForm((f) => ({ ...f, ville: e.target.value }))}
+                    placeholder="Ex: Paris" style={{
+                      width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                      borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "10px 12px", outline: "none", boxSizing: "border-box",
+                    }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Pays</label>
+                  <input value={form.pays} onChange={(e) => setForm((f) => ({ ...f, pays: e.target.value }))}
+                    placeholder="Ex: France" style={{
+                      width: "100%", marginTop: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                      borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "10px 12px", outline: "none", boxSizing: "border-box",
+                    }} />
+                </div>
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Situation familiale recherchée</label>
+              <div style={selectRowStyle}>
+                {["Peu importe", "Célibataire", "Divorcé(e)", "Veuf/veuve"].map((v) => (
+                  <button key={v} onClick={() => setForm((f) => ({ ...f, situationFamiliale: v }))} style={optionBtn(form.situationFamiliale === v)}>{v}</button>
+                ))}
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Projet de couple</label>
+              <div style={selectRowStyle}>
+                {["Relation sérieuse", "Mariage", "Peu importe"].map((v) => (
+                  <button key={v} onClick={() => setForm((f) => ({ ...f, projetCouple: v }))} style={optionBtn(form.projetCouple === v)}>{v}</button>
+                ))}
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Souhait de mariage</label>
+              <div style={selectRowStyle}>
+                {["Peu importe", "Oui", "Non"].map((v) => (
+                  <button key={v} onClick={() => setForm((f) => ({ ...f, souhaitMariage: v }))} style={optionBtn(form.souhaitMariage === v)}>{v}</button>
+                ))}
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Enfants</label>
+              <div style={selectRowStyle}>
+                {["Peu importe", "Aucun", "A des enfants", "Ouvert aux enfants"].map((v) => (
+                  <button key={v} onClick={() => setForm((f) => ({ ...f, enfants: v }))} style={optionBtn(form.enfants === v)}>{v}</button>
+                ))}
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Valeurs importantes pour vous</label>
+              <div style={selectRowStyle}>
+                {MATCHMAKING_VALUES.map((v) => (
+                  <button key={v} onClick={() => toggleValeur(v)} style={optionBtn(form.valeurs.includes(v))}>{v}</button>
+                ))}
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Personnalité recherchée</label>
+              <textarea value={form.personnaliteRecherchee} onChange={(e) => setForm((f) => ({ ...f, personnaliteRecherchee: e.target.value }))}
+                placeholder="Ex : quelqu'un de calme, ambitieux, à l'écoute..." rows={2} style={{
+                  width: "100%", marginTop: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "10px 12px", outline: "none", boxSizing: "border-box", resize: "vertical",
+                }} />
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Autres critères importants</label>
+              <textarea value={form.autresCriteres} onChange={(e) => setForm((f) => ({ ...f, autresCriteres: e.target.value }))}
+                placeholder="Ajoutez vos critères..." rows={2} style={{
+                  width: "100%", marginTop: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: 12, color: "#FBEFE9", fontSize: 13, padding: "10px 12px", outline: "none", boxSizing: "border-box", resize: "vertical",
+                }} />
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Comment souhaitez-vous être contacté par Lovinia ?</label>
+              <div style={selectRowStyle}>
+                {[
+                  { key: "email", label: "Par email" },
+                  { key: "notification", label: "Par notification" },
+                  { key: "telephone", label: "Par téléphone" },
+                  { key: "whatsapp", label: "Par WhatsApp" },
+                ].map((c) => (
+                  <button key={c.key} onClick={() => toggleContactPref(c.key)} style={optionBtn(form.contactPref.includes(c.key))}>{c.label}</button>
+                ))}
+              </div>
+
+              <label style={{ color: "#B39FBF", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, display: "block", marginTop: 18 }}>Fréquence souhaitée</label>
+              <div style={selectRowStyle}>
+                {["Ponctuelle", "Régulière"].map((v) => (
+                  <button key={v} onClick={() => setForm((f) => ({ ...f, frequenceSouhaitee: v }))} style={optionBtn(form.frequenceSouhaitee === v)}>{v}</button>
+                ))}
+              </div>
+
+              {mode === "autonome" && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 22, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: 14 }}>
+                  <span style={{ color: "#FBEFE9", fontSize: 13 }}>Visible par les autres membres</span>
+                  <button onClick={() => setForm((f) => ({ ...f, visible: !f.visible }))} style={{
+                    width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer",
+                    background: form.visible ? "#A78BFA" : "rgba(255,255,255,0.2)", position: "relative", transition: "background 0.2s",
+                  }}>
+                    <div style={{ width: 17, height: 17, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: form.visible ? 21 : 2, transition: "left 0.2s" }} />
+                  </button>
+                </div>
+              )}
+
+              <div style={{ marginTop: 22, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <ShieldCheck size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ color: "#8C7A94", fontSize: 11.5, margin: 0, lineHeight: 1.5 }}>
+                  Vos informations restent 100% confidentielles. Seuls les membres du service peuvent voir votre profil,
+                  et vous gardez le contrôle sur votre visibilité et vos préférences de contact à tout moment.
+                </p>
+              </div>
+
+              {error && <p style={{ color: "#FF6B5B", fontSize: 12, marginTop: 14, textAlign: "center" }}>{error}</p>}
+
+              {!status?.active && (
+                <div style={{ marginTop: 20, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ color: "#FBEFE9", fontSize: 13 }}>Total à payer</span>
+                  <span style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 18 }}>{priceLabel}</span>
+                </div>
+              )}
+
+              <button onClick={submitProfile} disabled={saving} style={{
+                width: "100%", marginTop: 16, padding: "15px 0", borderRadius: 999, border: "none",
+                cursor: saving ? "default" : "pointer", background: MATCHMAKING_GRAD, color: "#2A0E12",
+                fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 14.5, opacity: saving ? 0.7 : 1,
+              }}>
+                {saving
+                  ? (status?.paymentEnabled && !status?.active ? "Redirection..." : "Enregistrement...")
+                  : status?.active ? "Enregistrer mon profil" : status?.paymentEnabled ? `Payer ${priceLabel} par Mobile Money` : `Valider et activer (${priceLabel}, démo)`}
+              </button>
+            </div>
+          )}
+
+          {/* ---------- 4. Espace membre (tableau de bord) ---------- */}
+          {view === "home" && (
+            <div style={{ padding: "20px 22px 40px" }}>
+              <div style={{
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16,
+                padding: "14px 16px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <div>
+                  <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 14, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Crown size={15} color="#A78BFA" /> Membre Matchmaking
+                  </p>
+                  <p style={{ color: "#8C7A94", fontSize: 11, margin: "3px 0 0" }}>
+                    Mode : {mode === "autonome" ? "Je cherche moi-même" : "Accompagné par Lovinia"}
+                    {status?.expiresAt ? ` · jusqu'au ${new Date(status.expiresAt).toLocaleDateString("fr-FR")}` : ""}
+                  </p>
+                </div>
+                <button onClick={() => setView("profileForm")} style={{
+                  background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: 10, padding: "7px 10px", cursor: "pointer", color: "#A78BFA", display: "flex", alignItems: "center", gap: 5, fontSize: 11.5,
+                }}>
+                  <Settings size={13} /> Modifier
+                </button>
+              </div>
+
+              {error && <p style={{ color: "#FF6B5B", fontSize: 12, marginBottom: 14, textAlign: "center" }}>{error}</p>}
+
+              {mode === "autonome" ? (
+                <>
+                  <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+                    Profils Matchmaking {members.length > 0 ? `(${members.length})` : ""}
+                  </p>
+                  {members.length === 0 ? (
+                    <p style={{ color: "#8C7A94", fontSize: 13, textAlign: "center", marginTop: 30 }}>
+                      Pas encore d'autre membre correspondant pour l'instant — reviens bientôt.
+                    </p>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      {members.map((m) => (
+                        <button key={m.id} onClick={() => setDetailMember(m)} style={{
+                          textAlign: "left", borderRadius: 16, overflow: "hidden", cursor: "pointer",
+                          background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)", padding: 0,
+                        }}>
+                          <div style={{ width: "100%", aspectRatio: "1", background: "#2A1B33", position: "relative" }}>
+                            {(m.photos?.[0]?.url || m.img) && (
+                              <img src={m.photos?.[0]?.url || m.img} alt={m.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            )}
+                            <span style={{
+                              position: "absolute", top: 8, left: 8, background: MATCHMAKING_GRAD, color: "#2A0E12",
+                              fontSize: 9.5, fontWeight: 800, padding: "3px 8px", borderRadius: 999, fontFamily: "Manrope, sans-serif",
+                            }}>MATCHMAKING</span>
+                          </div>
+                          <div style={{ padding: "8px 10px 10px" }}>
+                            <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 13, margin: 0 }}>{m.name}, {m.age}</p>
+                            <p style={{ color: "#8C7A94", fontSize: 11, margin: "2px 0 0" }}>{m.city || m.country || ""}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 4 }}>
+                    Propositions de Lovinia
+                  </p>
+                  <p style={{ color: "#8C7A94", fontSize: 11.5, marginBottom: 14 }}>
+                    Notre équipe sélectionne pour vous des profils compatibles avec vos critères.
+                  </p>
+                  {suggestions.length === 0 ? (
+                    <p style={{ color: "#8C7A94", fontSize: 13, textAlign: "center", marginTop: 30 }}>
+                      Aucune proposition pour l'instant — notre équipe vous contactera dès qu'un profil compatible sera trouvé.
+                    </p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {suggestions.map((s) => (
+                        <div key={s.id} style={{
+                          borderRadius: 18, padding: 14, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)",
+                        }}>
+                          {s.myStatus === "pending" && (
+                            <p style={{ color: "#A78BFA", fontSize: 12, fontWeight: 700, margin: "0 0 10px" }}>
+                              Lovinia pense que cette rencontre pourrait vous intéresser ❤️
+                            </p>
+                          )}
+                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                            <div style={{ width: 52, height: 52, borderRadius: "50%", overflow: "hidden", background: "#2A1B33", flexShrink: 0 }}>
+                              {(s.profile?.photos?.[0]?.url || s.profile?.img) && (
+                                <img src={s.profile.photos?.[0]?.url || s.profile.img} alt={s.profile?.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              )}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 14, margin: 0 }}>
+                                {s.profile?.name}, {s.profile?.age}
+                              </p>
+                              <p style={{ color: "#8C7A94", fontSize: 11.5, margin: "2px 0 0" }}>{s.profile?.city || s.profile?.country || ""}</p>
+                            </div>
+                          </div>
+                          {s.myStatus === "pending" ? (
+                            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                              <button onClick={() => respondSuggestion(s, false)} disabled={respondingTo === s.id} style={{
+                                flex: 1, padding: "10px 0", borderRadius: 999, cursor: "pointer",
+                                background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 12.5,
+                              }}>Refuser</button>
+                              <button onClick={() => respondSuggestion(s, true)} disabled={respondingTo === s.id} style={{
+                                flex: 1, padding: "10px 0", borderRadius: 999, cursor: "pointer", border: "none",
+                                background: MATCHMAKING_GRAD, color: "#2A0E12", fontWeight: 800, fontSize: 12.5,
+                              }}>Ça m'intéresse</button>
+                            </div>
+                          ) : (
+                            <p style={{ fontSize: 11.5, marginTop: 10, color: s.myStatus === "accepted" ? "#3ECF6B" : "#8C7A94" }}>
+                              {s.myStatus === "accepted"
+                                ? (s.otherStatus === "accepted" ? "Vous êtes tous les deux intéressés — la conversation est ouverte !" : "Vous avez accepté — en attente de l'autre personne.")
+                                : "Vous avez refusé cette proposition."}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------- Fiche détaillée d'un membre (mode autonome) ---------- */}
+      {detailMember && (
+        <div onClick={() => setDetailMember(null)} style={{
+          position: "fixed", inset: 0, background: "rgba(10,6,14,0.9)", zIndex: 260,
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#1B1223", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 460, maxHeight: "85vh",
+            overflowY: "auto", padding: "18px 20px 28px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 17, margin: 0 }}>
+                {detailMember.name}, {detailMember.age}
+              </p>
+              <button onClick={() => setDetailMember(null)} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            {(detailMember.photos?.[0]?.url || detailMember.img) && (
+              <img src={detailMember.photos?.[0]?.url || detailMember.img} alt={detailMember.name}
+                style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 16, marginBottom: 14 }} />
+            )}
+            {detailMember.bio && <p style={{ color: "#F0E3EC", fontSize: 13.5, lineHeight: 1.6, marginBottom: 14 }}>{detailMember.bio}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+              {detailMember.city && <p style={{ color: "#D8C4D0", fontSize: 12.5, margin: 0 }}>📍 {detailMember.city}{detailMember.country ? `, ${detailMember.country}` : ""}</p>}
+              {detailMember.profession && <p style={{ color: "#D8C4D0", fontSize: 12.5, margin: 0 }}>💼 {detailMember.profession}</p>}
+              {detailMember.projet_couple && <p style={{ color: "#D8C4D0", fontSize: 12.5, margin: 0 }}>💍 Projet de couple : {detailMember.projet_couple}</p>}
+              {detailMember.enfants && <p style={{ color: "#D8C4D0", fontSize: 12.5, margin: 0 }}>👶 Enfants : {detailMember.enfants}</p>}
+            </div>
+            {detailMember.valeurs?.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+                {detailMember.valeurs.map((v) => (
+                  <span key={v} style={{ padding: "6px 12px", borderRadius: 999, fontSize: 11.5, background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)" }}>{v}</span>
+                ))}
+              </div>
+            )}
+            <button onClick={() => contactMember(detailMember)} disabled={contacting === detailMember.id} style={{
+              width: "100%", padding: "14px 0", borderRadius: 999, border: "none", cursor: "pointer",
+              background: MATCHMAKING_GRAD, color: "#2A0E12", fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 14,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              <MessageCircle size={16} /> {contacting === detailMember.id ? "Envoi..." : "Envoyer un message"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProfileScreen({ user, onLogout, onAccountDeleted, onOpenChat }) {
   const [name, setName] = useState(user?.name || "Toi");
   const [bio, setBio] = useState("Ajoute une bio pour te présenter.");
   const [profession, setProfession] = useState("");
@@ -3203,6 +3831,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [profileTab, setProfileTab] = useState("profil"); // "profil" | "galerie" | "apropos" | "verif"
   const [showSubscriptions, setShowSubscriptions] = useState(false);
+  const [showMatchmaking, setShowMatchmaking] = useState(false);
   const [acceptGifts, setAcceptGifts] = useState(true);
   const [giftSendersRestriction, setGiftSendersRestriction] = useState("everyone");
   const [hideGiftCount, setHideGiftCount] = useState(false);
@@ -3743,11 +4372,18 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
           { onClick: () => setShowWallet(true), icon: <Wallet size={19} color="#F2B84B" />, iconBg: "rgba(242,184,75,0.18)", title: "Mon portefeuille", desc: "Solde, recharge, historique." },
           { onClick: () => setShowSubscriptions(true), icon: <Crown size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Abonnements", desc: userPlan !== "free" ? `Pack ${SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan} actif` : "Gold, Premium, VIP." },
           { onClick: () => setShowMonetizedContent(true), icon: <Gem size={19} color="#3ECF6B" />, iconBg: "rgba(62,207,107,0.18)", title: "Contenu monétisé", desc: "Publie et gagne des Coins, gratuit." },
+          { onClick: () => setShowMatchmaking(true), icon: <Sparkles size={19} color="#A78BFA" />, iconBg: "rgba(167,139,250,0.18)", title: "Lovinia Matchmaking", desc: "Service premium, mise en relation personnalisée.", badge: "Nouveau" },
         ].map((card) => (
           <button key={card.title} onClick={card.onClick} style={{
-            display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 16, cursor: "pointer",
+            position: "relative", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 16, cursor: "pointer",
             background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)", textAlign: "left",
           }}>
+            {card.badge && (
+              <span style={{
+                position: "absolute", top: 10, right: 10, background: MATCHMAKING_GRAD, color: "#2A0E12",
+                fontSize: 8.5, fontWeight: 800, padding: "3px 7px", borderRadius: 999, fontFamily: "Manrope, sans-serif",
+              }}>{card.badge}</span>
+            )}
             <div style={{ width: 38, height: 38, borderRadius: "50%", background: card.iconBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
               {card.icon}
             </div>
@@ -3824,6 +4460,7 @@ function ProfileScreen({ user, onLogout, onAccountDeleted }) {
       {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
       {showSubscriptions && <SubscriptionsModal currentPlan={userPlan} onClose={() => setShowSubscriptions(false)} onSubscribed={(p) => setUserPlan(p)} />}
       {showMonetizedContent && <MonetizedContentScreen currentUserId={user?.id} onBack={() => setShowMonetizedContent(false)} />}
+      {showMatchmaking && <MatchmakingScreen onBack={() => setShowMatchmaking(false)} onOpenChat={onOpenChat} />}
 
       <button onClick={handleLogoutClick} disabled={loggingOut} style={{
         marginTop: 16, width: "100%", padding: "13px 0", borderRadius: 999, cursor: loggingOut ? "default" : "pointer",
@@ -5827,7 +6464,7 @@ function MainApp() {
             {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} userId={user?.id} onOpenChat={openChat} />}
             {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} onViewProfile={openProfile} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
-            {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} />}
+            {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} onOpenChat={openChat} />}
           </div>
           <div style={{
             display: "flex", justifyContent: "space-around", padding: "10px 8px 16px",
