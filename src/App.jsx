@@ -839,6 +839,10 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
       setShowPaywall(true);
       return;
     }
+    if (dir === "superlike" && API_BASE && limits && !limits.unlimited) {
+      showToast("Le Super Like est réservé aux membres Premium. Passe à un plan supérieur pour faire savoir instantanément à quelqu'un qu'il te plaît.");
+      return;
+    }
     if (dir === "superlike" && API_BASE && coins != null && coins < 10) {
       showToast("Pas assez de Lovinia Coins pour un Super Like (10 requis).");
       return;
@@ -868,6 +872,10 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
         }
         if (res.status === 402 && data.code === "INSUFFICIENT_COINS") {
           showToast("Pas assez de Lovinia Coins pour un Super Like.");
+          return;
+        }
+        if (res.status === 403 && data.code === "SUPERLIKE_REQUIRES_PREMIUM") {
+          showToast(data.error || "Le Super Like est réservé aux membres Premium. Passe à un plan supérieur pour en profiter.");
           return;
         }
         if (res.status === 403 && data.code === "EMAIL_NOT_VERIFIED") {
