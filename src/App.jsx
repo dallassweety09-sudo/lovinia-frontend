@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, ChevronDown, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap, ShieldCheck, DollarSign } from "lucide-react";
+import { X, Heart, Star, MessageCircle, User, Send, ArrowLeft, MapPin, Sparkles, SlidersHorizontal, Mail, Lock, LogIn, BadgeCheck, Camera, Crown, Zap, MoreVertical, Flag, ShieldOff, Eye, EyeOff, Plus, Trash2, Settings, Play, Grid, Gift, Coins, Wallet, ChevronRight, ChevronDown, RotateCcw, Video, Gem, Check, Search, Quote, Cigarette, Wine, Dumbbell, PawPrint, Moon, GraduationCap, ShieldCheck, DollarSign } from "lucide-react";
 
 // API_BASE : une fois le backend déployé, mets l'URL ici (ex: "https://ton-backend.up.railway.app")
 // Laisse vide "" pour rester en mode démo (données locales, sans vrai serveur).
@@ -700,7 +700,7 @@ function FiltersPanel({ filters, onApply, onClose }) {
   );
 }
 
-function DiscoverScreen({ onNewMatch, userId }) {
+function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
   // Initialisé une seule fois depuis les filtres mémorisés sur cet appareil (sinon les valeurs
   // par défaut) — évite que l'écran s'ouvre un instant avec les défauts avant d'appliquer les siens.
   const [filters, setFilters] = useState(() => loadStoredFilters(userId));
@@ -910,6 +910,66 @@ function DiscoverScreen({ onNewMatch, userId }) {
     setLastSwiped(null);
   }, [lastSwiped]);
 
+  // Bouton "Actualiser" (↩️) : recharge tout de suite les profils que l'utilisateur avait passés
+  // (croix), sans attendre le délai de réapparition automatique de 10 minutes. Les profils déjà
+  // matchés, bloqués ou signalés ne reviennent jamais (le backend ne touche qu'aux swipes 'pass').
+  const [refreshingPasses, setRefreshingPasses] = useState(false);
+  const refreshPasses = useCallback(async () => {
+    if (!API_BASE) {
+      showToast("Mode démo : reviens plus tard pour voir de nouveaux profils.");
+      return;
+    }
+    setRefreshingPasses(true);
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_BASE}/api/swipe/reset-passes`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await loadProfiles(filters);
+      showToast("Les profils que tu avais passés sont de retour !");
+    } catch {
+      showToast("Impossible de recharger les profils pour l'instant.");
+    } finally {
+      setRefreshingPasses(false);
+    }
+  }, [filters, loadProfiles]);
+
+  // Bouton "Message" (💬) : ouvre directement la conversation si les deux sont déjà matchés.
+  // Sinon, seul un plan payant peut écrire sans match préalable (le backend fait foi) — un
+  // utilisateur gratuit reçoit le message d'incitation demandé, sans qu'on ait besoin de suivre
+  // son plan côté frontend : on se base juste sur la réponse du serveur.
+  const [startingChatWith, setStartingChatWith] = useState(null);
+  const openMessageWith = useCallback(async (profile) => {
+    if (!API_BASE) {
+      showToast("Vous devez être matché avec cette personne pour lui écrire. Passez en Premium pour pouvoir envoyer des messages sans match préalable.");
+      return;
+    }
+    setStartingChatWith(profile.id);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/messages/start/${profile.id}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Impossible d'ouvrir la conversation pour l'instant.");
+        return;
+      }
+      onOpenChat?.({
+        matchId: data.matchId,
+        id: profile.id,
+        name: profile.name,
+        img: profile.img || profile.photos?.[0]?.url || "",
+      });
+    } catch {
+      showToast("Connexion au serveur impossible.");
+    } finally {
+      setStartingChatWith(null);
+    }
+  }, [onOpenChat]);
+
   return (
     <div style={{ padding: "18px 18px 0", display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -934,6 +994,15 @@ function DiscoverScreen({ onNewMatch, userId }) {
 
       {showFilters && (
         <FiltersPanel filters={filters} onApply={applyFilters} onClose={() => setShowFilters(false)} />
+      )}
+
+      {toast && (
+        <div style={{
+          position: "absolute", top: 8, left: 18, right: 18, zIndex: 70,
+          background: "rgba(27,18,35,0.97)", border: "1px solid rgba(255,255,255,0.16)",
+          borderRadius: 14, padding: "12px 16px", color: "#FBEFE9", fontSize: 13, lineHeight: 1.4,
+          boxShadow: "0 12px 24px rgba(20,8,28,0.5)", textAlign: "center",
+        }}>{toast}</div>
       )}
 
       <div style={{ position: "relative", flex: 1, minHeight: 420 }}>
@@ -982,19 +1051,39 @@ function DiscoverScreen({ onNewMatch, userId }) {
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", gap: 20, padding: "18px 0 8px" }}>
-        <button onClick={() => swipe("pass")} style={btnCircle("#2A1B33", "#FF6B5B", 58)}>
-          <X size={26} />
+      {/* Toutes les actions principales sont directement accessibles ici, sans devoir ouvrir un
+          autre menu : Actualiser (recharge les profils passés), Pas intéressé, Super Like, J'aime,
+          et Message (visible pour tout le monde — son comportement dépend du match/plan, voir
+          openMessageWith ci-dessus). */}
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, padding: "18px 0 8px" }}>
+        <button
+          onClick={refreshPasses}
+          disabled={refreshingPasses}
+          title="Revoir les profils passés"
+          style={{ ...btnCircle("#2A1B33", "#B98CFF", 46), opacity: refreshingPasses ? 0.5 : 1 }}
+        >
+          <RotateCcw size={18} />
+        </button>
+        <button onClick={() => swipe("pass")} style={btnCircle("#2A1B33", "#FF6B5B", 54)}>
+          <X size={24} />
+        </button>
+        <button onClick={() => swipe("superlike")} style={btnCircle("#2A1B33", "#4FA8FF", 46)}>
+          <Star size={19} fill="#4FA8FF" />
         </button>
         <button onClick={() => swipe("like")} style={{
-          ...btnCircle("transparent", "#2A0E12", 68),
+          ...btnCircle("transparent", "#2A0E12", 62),
           background: "linear-gradient(120deg, #FF6B5B 0%, #E8548A 55%, #9B5DE5 100%)",
           boxShadow: "0 14px 26px -8px rgba(232,84,138,0.55)",
         }}>
-          <Heart size={30} fill="#2A0E12" />
+          <Heart size={27} fill="#2A0E12" />
         </button>
-        <button onClick={() => swipe("like")} style={btnCircle("#2A1B33", "#F2B84B", 58)}>
-          <Star size={24} fill="#F2B84B" />
+        <button
+          onClick={() => deck[0] && openMessageWith(deck[0])}
+          disabled={!deck[0] || startingChatWith === deck[0]?.id}
+          title="Envoyer un message"
+          style={{ ...btnCircle("#2A1B33", "#F2B84B", 46), opacity: !deck[0] ? 0.4 : 1 }}
+        >
+          <MessageCircle size={19} />
         </button>
       </div>
 
@@ -5735,7 +5824,7 @@ function MainApp() {
       ) : (
         <>
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} userId={user?.id} />}
+            {tab === "discover" && <DiscoverScreen onNewMatch={handleNewMatch} userId={user?.id} onOpenChat={openChat} />}
             {tab === "matches" && <MatchesScreen matches={matches} onOpenChat={openChat} onViewProfile={openProfile} />}
             {tab === "messages" && <MessagesScreen conversations={conversations} onOpenChat={openChat} />}
             {tab === "profile" && <ProfileScreen user={user} onLogout={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} onAccountDeleted={() => { localStorage.removeItem("token"); setUser(null); setPreAuthStage("onboarding"); setOnboardingStep(0); }} />}
