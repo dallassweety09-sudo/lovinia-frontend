@@ -19,9 +19,10 @@ const CLOUDINARY_UPLOAD_PRESET = "lovinia_photos";
 // GOOGLE_CLIENT_ID : pour le bouton "Continuer avec Google".
 const GOOGLE_CLIENT_ID = "564982949909-m4prgodt5hovva2lm48087lt0e58q829.apps.googleusercontent.com";
 
-// VAPID_PUBLIC_KEY : pour les notifications push. Doit correspondre à la clé publique
-// générée côté backend (variable VAPID_PUBLIC_KEY sur Railway).
-const VAPID_PUBLIC_KEY = "BEeHZ8XqHqavRyWlvWcRAJDnn5xKNppv_IjhsJ8jR3QmN_aWw4vtNAbU-OeOUR--O1Z2ocF5qb_LH_kuuQahlCw";
+// VAPID_PUBLIC_KEY : pour les notifications push. Doit correspondre EXACTEMENT à la variable
+// VAPID_PUBLIC_KEY définie côté backend sur Railway (la clé privée correspondante va dans
+// VAPID_PRIVATE_KEY sur Railway — voir le mémo fourni pour la paire générée le 2026-08-07).
+const VAPID_PUBLIC_KEY = "BK8Biyb2Sa9qKQTZ4R5SEeEevyFiHbP7_xU_Z_Ti3zh7-RXDZEoxy3fhzPyU3i00ebaIts2hPS8C7PTE-o-BJa8";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
