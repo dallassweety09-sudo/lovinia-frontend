@@ -943,41 +943,6 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
     }
   }, [filters, loadProfiles]);
 
-  // Bouton "Message" (💬) : ouvre directement la conversation si les deux sont déjà matchés.
-  // Sinon, seul un plan payant peut écrire sans match préalable (le backend fait foi) — un
-  // utilisateur gratuit reçoit le message d'incitation demandé, sans qu'on ait besoin de suivre
-  // son plan côté frontend : on se base juste sur la réponse du serveur.
-  const [startingChatWith, setStartingChatWith] = useState(null);
-  const openMessageWith = useCallback(async (profile) => {
-    if (!API_BASE) {
-      showToast("Vous devez être matché avec cette personne pour lui écrire. Passez en Premium pour pouvoir envoyer des messages sans match préalable.");
-      return;
-    }
-    setStartingChatWith(profile.id);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/messages/start/${profile.id}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || "Impossible d'ouvrir la conversation pour l'instant.");
-        return;
-      }
-      onOpenChat?.({
-        matchId: data.matchId,
-        id: profile.id,
-        name: profile.name,
-        img: profile.img || profile.photos?.[0]?.url || "",
-      });
-    } catch {
-      showToast("Connexion au serveur impossible.");
-    } finally {
-      setStartingChatWith(null);
-    }
-  }, [onOpenChat]);
-
   return (
     <div style={{ padding: "18px 18px 0", display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -1060,9 +1025,8 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
       </div>
 
       {/* Toutes les actions principales sont directement accessibles ici, sans devoir ouvrir un
-          autre menu : Actualiser (recharge les profils passés), Pas intéressé, Super Like, J'aime,
-          et Message (visible pour tout le monde — son comportement dépend du match/plan, voir
-          openMessageWith ci-dessus). */}
+          autre menu : Actualiser (recharge les profils passés), Pas intéressé, Super Like, J'aime.
+          Le bouton Message a été retiré de cette barre à la demande de l'utilisateur. */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, padding: "18px 0 8px" }}>
         <button
           onClick={refreshPasses}
@@ -1084,14 +1048,6 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
           boxShadow: "0 14px 26px -8px rgba(232,84,138,0.55)",
         }}>
           <Heart size={27} fill="#2A0E12" />
-        </button>
-        <button
-          onClick={() => deck[0] && openMessageWith(deck[0])}
-          disabled={!deck[0] || startingChatWith === deck[0]?.id}
-          title="Envoyer un message"
-          style={{ ...btnCircle("#2A1B33", "#F2B84B", 46), opacity: !deck[0] ? 0.4 : 1 }}
-        >
-          <MessageCircle size={19} />
         </button>
       </div>
 
