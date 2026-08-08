@@ -1065,14 +1065,14 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
             Limite quotidienne atteinte
           </p>
           <p style={{ color: "#D8C4D0", fontSize: 13.5, marginTop: 8, maxWidth: 260 }}>
-            Tu as utilisé tes {limits?.limit || ""} likes gratuits d'aujourd'hui. Passe Premium pour des likes illimités, à tout moment.
+            Tu as utilisé tes {limits?.limit || ""} likes gratuits d'aujourd'hui. Passe au moins au Pack Gold pour des likes illimités, à tout moment.
           </p>
 
           <div style={{ width: "100%", maxWidth: 280, marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
             {[
-              { name: "Premium", price: "10 $ / 2 mois", detail: "Likes illimités", icon: Zap },
-              { name: "VIP", price: "15 $ / 2 mois", detail: "+ Messages sans match, profil mis en avant", icon: Crown },
-              { name: "Super VIP", price: "50 $ / 12 mois", detail: "Tous les avantages, priorité maximale", icon: Sparkles },
+              { name: "Pack Gold", price: "5 $ / mois", detail: "Likes illimités + contenu privé", icon: Zap },
+              { name: "Pack Premium", price: "10 $ / mois", detail: "+ Super Like, messages sans match, stats", icon: Crown },
+              { name: "Pack VIP", price: "15 $ / mois", detail: "+ contenus privés des autres membres, Coins offerts", icon: Sparkles },
             ].map((plan) => (
               <div key={plan.name} style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14,
@@ -1877,6 +1877,146 @@ function VisitorsModal({ onClose }) {
   );
 }
 
+// "Voir qui a aimé ton profil" — avantage Premium/VIP. Les comptes gratuits/Gold voient un teaser
+// avec le nombre de likes reçus et une invitation à passer Premium ; les comptes Premium/VIP
+// voient la liste complète.
+function LikesReceivedModal({ onClose, onUpgrade }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!API_BASE) { setLoading(false); return; }
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/me/likes-received`, { headers: { Authorization: `Bearer ${token}` } });
+        const d = await res.json();
+        setData(d);
+      } catch {
+        setData({ count: 0, locked: true, profiles: [] });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "75vh", overflowY: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Qui a aimé mon profil</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        {!API_BASE && <p style={{ color: "#6B5A73", fontSize: 12.5 }}>Connecte le backend pour voir tes likes reçus.</p>}
+        {API_BASE && loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+
+        {API_BASE && !loading && data?.locked && (
+          <div style={{ textAlign: "center", padding: "18px 8px" }}>
+            <Heart size={32} color="#FF6B5B" fill="#FF6B5B" />
+            <p style={{ color: "#FBEFE9", fontSize: 15, fontWeight: 700, marginTop: 10 }}>
+              {data.count > 0 ? `${data.count} personne${data.count > 1 ? "s" : ""} t'ont déjà aimé(e)` : "Personne ne t'a encore liké(e)"}
+            </p>
+            <p style={{ color: "#B39FBF", fontSize: 12.5, marginTop: 6 }}>Passe au Pack Premium ou VIP pour voir qui c'est et matcher directement.</p>
+            {onUpgrade && (
+              <button onClick={onUpgrade} style={{
+                marginTop: 14, padding: "10px 22px", borderRadius: 999, cursor: "pointer", border: "none",
+                background: "linear-gradient(120deg, #F2B84B, #E8548A)", color: "#2A0E12", fontWeight: 700, fontSize: 13,
+              }}>Voir les packs</button>
+            )}
+          </div>
+        )}
+
+        {API_BASE && !loading && data && !data.locked && data.profiles.length === 0 && (
+          <p style={{ color: "#B39FBF", fontSize: 13 }}>Personne ne t'a encore liké(e).</p>
+        )}
+        {data && !data.locked && data.profiles.map((p) => (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <img src={p.img} alt={p.name} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+            <div style={{ flex: 1 }}>
+              <p style={{ color: "#FBEFE9", fontSize: 14, fontWeight: 600, margin: 0 }}>
+                {p.name}{p.age ? `, ${p.age}` : ""} {p.action === "superlike" ? "⭐" : "❤️"}
+              </p>
+              <p style={{ color: "#8C7A94", fontSize: 11.5, margin: 0 }}>{p.city || ""}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Statistiques détaillées — avantage Premium/VIP.
+function StatsModal({ onClose, onUpgrade }) {
+  const [stats, setStats] = useState(null);
+  const [locked, setLocked] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!API_BASE) { setLoading(false); return; }
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/me/stats`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status === 403) { setLocked(true); return; }
+        const d = await res.json();
+        setStats(d);
+      } catch {
+        setLocked(true);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const rows = stats ? [
+    { label: "Likes envoyés", value: stats.likesSent },
+    { label: "Dont Super Likes", value: stats.superlikesSent },
+    { label: "Likes reçus", value: stats.likesReceived },
+    { label: "Matchs", value: stats.matches },
+    { label: "Profils passés", value: stats.passesSent },
+  ] : [];
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,6,14,0.85)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "#2A1B33", borderRadius: "20px 20px 0 0", padding: "20px 22px 28px", width: "100%", maxWidth: 400, maxHeight: "75vh", overflowY: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Mes statistiques</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8C7A94", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        {!API_BASE && <p style={{ color: "#6B5A73", fontSize: 12.5 }}>Connecte le backend pour voir tes statistiques.</p>}
+        {API_BASE && loading && <p style={{ color: "#B39FBF", fontSize: 13 }}>Chargement...</p>}
+
+        {API_BASE && !loading && locked && (
+          <div style={{ textAlign: "center", padding: "18px 8px" }}>
+            <BadgeCheck size={32} color="#A78BFA" />
+            <p style={{ color: "#FBEFE9", fontSize: 15, fontWeight: 700, marginTop: 10 }}>Statistiques réservées à Premium et VIP</p>
+            <p style={{ color: "#B39FBF", fontSize: 12.5, marginTop: 6 }}>Passe à un plan supérieur pour suivre tes likes, matchs et plus.</p>
+            {onUpgrade && (
+              <button onClick={onUpgrade} style={{
+                marginTop: 14, padding: "10px 22px", borderRadius: 999, cursor: "pointer", border: "none",
+                background: "linear-gradient(120deg, #F2B84B, #E8548A)", color: "#2A0E12", fontWeight: 700, fontSize: 13,
+              }}>Voir les packs</button>
+            )}
+          </div>
+        )}
+
+        {stats && rows.map((r) => (
+          <div key={r.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <span style={{ color: "#D8C4D0", fontSize: 13.5 }}>{r.label}</span>
+            <span style={{ color: "#FBEFE9", fontSize: 15, fontWeight: 700 }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function GiftPickerModal({ postId, onClose, onSent }) {
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
   const [gifts, setGifts] = useState([]);
@@ -1983,28 +2123,30 @@ function GiftPickerModal({ postId, onClose, onSent }) {
   );
 }
 
-function PrivateContentLock({ isVideo }) {
-  const [subscribing, setSubscribing] = useState(false);
-  const [done, setDone] = useState(false);
+// Contenu verrouillé : n'importe qui peut le débloquer en payant le prix fixé par le créateur en
+// Lovinia Coins (comme une story payante). Les VIP l'ont automatiquement inclus dans leur
+// abonnement (le backend gère ça tout seul si le déverrouillage est tenté par un VIP).
+function PrivateContentLock({ isVideo, postId, unlockPriceCoins, onUnlocked, onOpenSubscriptions }) {
+  const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState("");
+  const price = unlockPriceCoins || 50;
 
   const unlock = async () => {
-    setSubscribing(true);
+    setUnlocking(true);
     setError("");
-    if (!API_BASE) { setDone(true); setSubscribing(false); return; }
+    if (!API_BASE) { onUnlocked?.(null); setUnlocking(false); return; }
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/subscribe`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ plan: "vip" }),
+      const res = await fetch(`${API_BASE}/api/posts/${postId}/unlock`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Échec de l'abonnement.");
-      setDone(true);
+      if (!res.ok) throw new Error(data.error || "Échec du déverrouillage.");
+      onUnlocked?.(data.post);
     } catch (e) {
       setError(e.message || "Une erreur est survenue.");
     } finally {
-      setSubscribing(false);
+      setUnlocking(false);
     }
   };
 
@@ -2018,25 +2160,25 @@ function PrivateContentLock({ isVideo }) {
         <Lock size={24} color="#C9AEFF" />
       </div>
       <p style={{ color: "#FBEFE9", fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: 15, margin: 0 }}>
-        {isVideo ? "Vidéo privée" : "Photo privée"}
+        {isVideo ? "Vidéo verrouillée" : "Photo verrouillée"}
       </p>
       <p style={{ color: "#C6B4C9", fontSize: 12, marginTop: 6, marginBottom: 18, maxWidth: 240 }}>
-        Réservé aux membres avec le Pack VIP.
+        Débloque ce contenu pour {price} Lovinia Coins, ou passe VIP pour tout voir sans payer à chaque fois.
       </p>
-      {done ? (
-        <p style={{ color: "#3ECF6B", fontSize: 12.5, fontWeight: 600 }}>Pack VIP activé ✓ — referme puis rouvre la publication pour la voir.</p>
-      ) : (
-        <>
-          <button onClick={unlock} disabled={subscribing} style={{
-            padding: "11px 22px", borderRadius: 999, border: "none", cursor: subscribing ? "default" : "pointer",
-            background: "linear-gradient(120deg, #F2B84B, #FF6B5B)", color: "#2A0E12",
-            fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13,
-          }}>
-            {subscribing ? "Activation..." : "👑 Débloquer avec le Pack VIP"}
-          </button>
-          {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 10 }}>{error}</p>}
-        </>
+      <button onClick={unlock} disabled={unlocking} style={{
+        padding: "11px 22px", borderRadius: 999, border: "none", cursor: unlocking ? "default" : "pointer",
+        background: "linear-gradient(120deg, #F2B84B, #FF6B5B)", color: "#2A0E12",
+        fontFamily: "Manrope, sans-serif", fontWeight: 800, fontSize: 13,
+      }}>
+        {unlocking ? "Déverrouillage..." : `🔓 Débloquer pour ${price} Coins`}
+      </button>
+      {onOpenSubscriptions && (
+        <button onClick={onOpenSubscriptions} style={{
+          marginTop: 10, padding: "8px 18px", borderRadius: 999, cursor: "pointer",
+          background: "rgba(255,255,255,0.08)", color: "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontSize: 12,
+        }}>👑 Passer VIP (tout inclus)</button>
       )}
+      {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 10 }}>{error}</p>}
     </div>
   );
 }
@@ -2058,6 +2200,7 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
   const [giftBurst, setGiftBurst] = useState(null); // icône affichée brièvement à l'envoi
   const [viewCount, setViewCount] = useState(post.viewCount || 0);
   const [showViewers, setShowViewers] = useState(false);
+  const [unlockedPost, setUnlockedPost] = useState(post);
 
   useEffect(() => {
     if (!API_BASE) return;
@@ -2197,12 +2340,21 @@ function PostDetailModal({ post, isOwner, currentUserId, onClose, onDeleted, onU
         display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
         <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", background: "#000", flexShrink: 0 }}>
-          {post.locked ? (
-            <PrivateContentLock isVideo={post.media_type === "video"} />
-          ) : post.media_type === "video" ? (
-            <video src={post.media_url} controls playsInline preload="metadata" poster={getVideoThumbnail(post.media_url)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          {unlockedPost.locked ? (
+            <PrivateContentLock
+              isVideo={post.media_type === "video"}
+              postId={post.id}
+              unlockPriceCoins={post.unlockPriceCoins}
+              onUnlocked={(unlockedData) => {
+                const next = unlockedData || { ...post, locked: false };
+                setUnlockedPost(next);
+                onUpdated?.(post.id, { locked: next.locked, media_url: next.media_url, unlockedByMe: true });
+              }}
+            />
+          ) : unlockedPost.media_type === "video" ? (
+            <video src={unlockedPost.media_url} controls playsInline preload="metadata" poster={getVideoThumbnail(unlockedPost.media_url)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           ) : (
-            <img src={post.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            <img src={unlockedPost.media_url} alt="Publication" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           )}
           {giftBurst && (
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
@@ -2433,7 +2585,7 @@ function PostsGrid({ posts, isOwner, currentUserId, onOpen, showEarnings }) {
               padding: "3px 7px", borderRadius: 999, fontSize: 9, fontWeight: 700, fontFamily: "Manrope, sans-serif",
               background: "rgba(155,93,229,0.85)", color: "#FBEFE9",
             }}>
-              <Lock size={9} /> Privé
+              <Lock size={9} /> {p.locked ? `${p.unlockPriceCoins || 50} Coins` : "Verrouillé"}
             </div>
           )}
           {isOwner && p.moderation_status && p.moderation_status !== "approved" && (
@@ -2478,6 +2630,8 @@ function MonetizedContentScreen({ currentUserId, onBack }) {
   const [openPost, setOpenPost] = useState(null);
   const [summary, setSummary] = useState(null);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [lockNext, setLockNext] = useState(false);
+  const [lockPriceNext, setLockPriceNext] = useState(50);
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
 
@@ -2525,7 +2679,9 @@ function MonetizedContentScreen({ currentUserId, onBack }) {
         const res = await fetch(`${API_BASE}/api/posts`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-          body: JSON.stringify({ mediaUrl: url, mediaType, monetized: true }),
+          body: JSON.stringify(lockNext
+            ? { mediaUrl: url, mediaType, locked: true, unlockPriceCoins: lockPriceNext }
+            : { mediaUrl: url, mediaType, monetized: true }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Échec de la publication.");
@@ -2567,7 +2723,13 @@ function MonetizedContentScreen({ currentUserId, onBack }) {
           <div style={{ display: "flex", gap: 18, marginTop: 12 }}>
             <span style={{ color: "#D8C4D0", fontSize: 12 }}>{summary?.postCount ?? 0} publication{(summary?.postCount ?? 0) > 1 ? "s" : ""}</span>
             <span style={{ color: "#D8C4D0", fontSize: 12 }}>{summary?.giftCount ?? 0} cadeau{(summary?.giftCount ?? 0) > 1 ? "x" : ""} reçu{(summary?.giftCount ?? 0) > 1 ? "s" : ""}</span>
+            {summary?.unlockCount > 0 && (
+              <span style={{ color: "#D8C4D0", fontSize: 12 }}>{summary.unlockCount} déverrouillage{summary.unlockCount > 1 ? "s" : ""}</span>
+            )}
           </div>
+          <p style={{ color: "#8C7A94", fontSize: 10.5, marginTop: 10, lineHeight: 1.5 }}>
+            À chaque cadeau reçu ou déverrouillage de ton contenu, Lovinia garde 30% (commission de la plateforme) et tu reçois 70% — crédités directement sur ce solde, retirable à tout moment.
+          </p>
           <button onClick={() => setShowWithdraw(true)} style={{
             marginTop: 14, width: "100%", padding: "10px 0", borderRadius: 12, cursor: "pointer",
             background: "#3ECF6B", border: "none", color: "#0A2412", fontWeight: 700, fontSize: 13,
@@ -2593,6 +2755,43 @@ function MonetizedContentScreen({ currentUserId, onBack }) {
           <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
           <input ref={videoInputRef} type="file" accept="video/*" onChange={handleFile} style={{ display: "none" }} />
         </div>
+
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px",
+          background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, marginBottom: 10,
+        }}>
+          <div>
+            <p style={{ color: "#FBEFE9", fontSize: 12.5, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              <Lock size={13} color="#C9AEFF" /> Verrouiller la prochaine publication
+            </p>
+            <p style={{ color: "#8C7A94", fontSize: 10.5, margin: "3px 0 0" }}>
+              Nécessite un profil vérifié. Chacun paie {lockPriceNext} Coins pour la débloquer (VIP inclus automatiquement).
+            </p>
+          </div>
+          <button onClick={() => setLockNext((v) => !v)} style={{
+            width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 10,
+            background: lockNext ? "#C9AEFF" : "rgba(255,255,255,0.2)", position: "relative",
+          }}>
+            <div style={{ width: 17, height: 17, borderRadius: "50%", background: "#1B1223", position: "absolute", top: 2.5, left: lockNext ? 21 : 2, transition: "left 0.2s" }} />
+          </button>
+        </div>
+        {lockNext && (
+          <>
+            <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+              {[30, 50, 100, 200].map((price) => (
+                <button key={price} onClick={() => setLockPriceNext(price)} style={{
+                  flex: 1, padding: "7px 0", borderRadius: 10, fontSize: 11.5, cursor: "pointer",
+                  background: lockPriceNext === price ? "#C9AEFF" : "rgba(255,255,255,0.08)",
+                  color: lockPriceNext === price ? "#2A0E12" : "#FBEFE9", border: "1px solid rgba(255,255,255,0.14)", fontWeight: 700,
+                }}>{price}</button>
+              ))}
+            </div>
+            <p style={{ color: "#6B5A73", fontSize: 10, marginBottom: 10 }}>
+              Sur chaque déverrouillage à {lockPriceNext} Coins, tu recevras 70% ({Math.floor(lockPriceNext * 0.7)} Coins), et Lovinia garde 30% ({lockPriceNext - Math.floor(lockPriceNext * 0.7)} Coins) de commission.
+            </p>
+          </>
+        )}
+
         <p style={{ color: "#6B5A73", fontSize: 11, marginBottom: 10 }}>Photos, ou vidéos de 30 secondes maximum. Toutes reçoivent likes, commentaires et cadeaux.</p>
         {error && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginBottom: 10 }}>{error}</p>}
 
@@ -2662,10 +2861,21 @@ const SUBSCRIPTION_PLAN_STYLE = {
   vip: { grad: "linear-gradient(120deg, #9B5DE5, #FF6B5B)", icon: "💎", border: "rgba(155,93,229,0.4)" },
 };
 
+// Catalogue de secours si /api/plans est injoignable — tenu synchronisé avec SUBSCRIPTION_PLANS
+// côté backend (server.js). Gold < Premium < VIP, chaque palier inclut les avantages du dessous.
 const FALLBACK_PLANS = {
-  gold: { name: "Pack Gold", priceUSD: 5, priceXAF: 3000, features: ["Badge Gold sur le profil", "Support client prioritaire"] },
-  premium: { name: "Pack Premium", priceUSD: 10, features: ["Matchs illimités", "Mise en avant du profil", "Voir qui a aimé ton profil", "Filtres avancés", "Priorité dans les recherches", "Boost du profil", "Plus de Super Likes", "Badge Premium", "Réduction sur les LoviCoins", "Statistiques détaillées"] },
-  vip: { name: "Pack VIP", priceUSD: 15, features: ["Tous les avantages Premium", "Consultation des photos et vidéos privées", "Accès aux contenus réservés VIP", "Cadeaux VIP exclusifs", "Bonus mensuel de LoviCoins", "Badge VIP animé", "Visibilité maximale", "Service client prioritaire"] },
+  gold: {
+    name: "Pack Gold", priceUSD: 5, priceXAF: 3000,
+    features: ["Likes illimités (plus de limite quotidienne)", "Badge Gold sur le profil", "Publication de contenu privé (avec vérification d'identité)", "-10% sur l'achat de Lovinia Coins", "Support client prioritaire"],
+  },
+  premium: {
+    name: "Pack Premium", priceUSD: 10, priceXAF: 6000,
+    features: ["Tous les avantages Gold", "Super Like illimité (10 Lovinia Coins par envoi)", "Écrire à quelqu'un sans attendre un match", "Boost de profil deux fois plus long", "Voir qui a aimé ton profil", "Statistiques détaillées (likes, matchs, vues)", "-20% sur l'achat de Lovinia Coins", "Badge Premium"],
+  },
+  vip: {
+    name: "Pack VIP", priceUSD: 15, priceXAF: 9000,
+    features: ["Tous les avantages Premium", "Accès aux photos et vidéos privées des autres membres", "100 Lovinia Coins offerts chaque mois", "-30% sur l'achat de Lovinia Coins", "Badge VIP animé", "Service client prioritaire"],
+  },
 };
 
 function SubscriptionsModal({ currentPlan, onClose, onSubscribed }) {
@@ -3002,12 +3212,13 @@ function ProfileSettingsModal({ extraInfo, extraInfoSaving, updateExtraInfo, onC
   );
 }
 
-function WalletModal({ onClose }) {
+function WalletModal({ onClose, plan }) {
   const [coins, setCoins] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(!!API_BASE);
   const [error, setError] = useState("");
   const [coinPacks, setCoinPacks] = useState({});
+  const [discount, setDiscount] = useState(0);
   const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [buyingPack, setBuyingPack] = useState(null);
   const [buyError, setBuyError] = useState("");
@@ -3030,6 +3241,7 @@ function WalletModal({ onClose }) {
         const cfg = await configRes.json();
         setPaymentEnabled(!!cfg.enabled);
         setCoinPacks(cfg.coinPacks || {});
+        setDiscount((cfg.coinPackDiscountByPlan || {})[plan] || 0);
       }
     } catch {
       setError("Impossible de charger ton portefeuille pour le moment.");
@@ -3077,25 +3289,35 @@ function WalletModal({ onClose }) {
 
         {paymentEnabled && Object.keys(coinPacks).length > 0 && (
           <div style={{ padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Recharger (Mobile Money)</p>
+            <p style={{ color: "#8C7A94", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+              Recharger (Mobile Money){discount > 0 ? ` — ta réduction ${plan === "gold" ? "Gold" : plan === "premium" ? "Premium" : "VIP"} de -${Math.round(discount * 100)}% est appliquée` : ""}
+            </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {Object.entries(coinPacks).map(([key, pack]) => (
-                <button
-                  key={key} onClick={() => buyPack(key)} disabled={buyingPack === key}
-                  style={{
-                    padding: "10px 8px", borderRadius: 12, cursor: buyingPack === key ? "default" : "pointer",
-                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(242,184,75,0.35)",
-                    color: "#FBEFE9", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 700, fontSize: 13.5 }}>
-                    <Coins size={13} color="#F2B84B" /> {pack.coins}
-                  </span>
-                  <span style={{ fontSize: 11, color: "#8C7A94" }}>
-                    {buyingPack === key ? "Redirection..." : `${pack.priceXAF.toLocaleString("fr-FR")} FCFA`}
-                  </span>
-                </button>
-              ))}
+              {Object.entries(coinPacks).map(([key, pack]) => {
+                const finalPrice = Math.round(pack.priceXAF * (1 - discount));
+                return (
+                  <button
+                    key={key} onClick={() => buyPack(key)} disabled={buyingPack === key}
+                    style={{
+                      padding: "10px 8px", borderRadius: 12, cursor: buyingPack === key ? "default" : "pointer",
+                      background: "rgba(255,255,255,0.06)", border: "1px solid rgba(242,184,75,0.35)",
+                      color: "#FBEFE9", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 700, fontSize: 13.5 }}>
+                      <Coins size={13} color="#F2B84B" /> {pack.coins}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#8C7A94" }}>
+                      {buyingPack === key ? "Redirection..." : discount > 0 ? (
+                        <>
+                          <span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 4 }}>{pack.priceXAF.toLocaleString("fr-FR")}</span>
+                          {finalPrice.toLocaleString("fr-FR")} FCFA
+                        </>
+                      ) : `${pack.priceXAF.toLocaleString("fr-FR")} FCFA`}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {buyError && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 8 }}>{buyError}</p>}
           </div>
@@ -3796,6 +4018,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted, onOpenChat }) {
   const [profileTab, setProfileTab] = useState("profil"); // "profil" | "galerie" | "apropos" | "verif"
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [showMatchmaking, setShowMatchmaking] = useState(false);
+  const [showLikesReceived, setShowLikesReceived] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [acceptGifts, setAcceptGifts] = useState(true);
   const [giftSendersRestriction, setGiftSendersRestriction] = useState("everyone");
   const [hideGiftCount, setHideGiftCount] = useState(false);
@@ -4333,6 +4557,8 @@ function ProfileScreen({ user, onLogout, onAccountDeleted, onOpenChat }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {[
           { onClick: () => setShowVisitors(true), icon: <Eye size={19} color="#FF6B5B" />, iconBg: "rgba(255,107,91,0.18)", title: "Qui a visité mon profil", desc: "Vois qui s'intéresse à toi." },
+          { onClick: () => setShowLikesReceived(true), icon: <Heart size={19} color="#FF6B5B" />, iconBg: "rgba(255,107,91,0.18)", title: "Qui a aimé mon profil", desc: "Premium & VIP." },
+          { onClick: () => setShowStats(true), icon: <BadgeCheck size={19} color="#A78BFA" />, iconBg: "rgba(167,139,250,0.18)", title: "Mes statistiques", desc: "Premium & VIP." },
           { onClick: () => setShowWallet(true), icon: <Wallet size={19} color="#F2B84B" />, iconBg: "rgba(242,184,75,0.18)", title: "Mon portefeuille", desc: "Solde, recharge, historique." },
           { onClick: () => setShowSubscriptions(true), icon: <Crown size={19} color="#A78BFA" />, iconBg: "rgba(155,93,229,0.18)", title: "Abonnements", desc: userPlan !== "free" ? `Pack ${SUBSCRIPTION_PLAN_LABELS[userPlan] || userPlan} actif` : "Gold, Premium, VIP." },
           { onClick: () => setShowMonetizedContent(true), icon: <Gem size={19} color="#3ECF6B" />, iconBg: "rgba(62,207,107,0.18)", title: "Contenu monétisé", desc: "Publie et gagne des Coins, gratuit." },
@@ -4421,7 +4647,19 @@ function ProfileScreen({ user, onLogout, onAccountDeleted, onOpenChat }) {
       {pushError && <p style={{ color: "#FF6B5B", fontSize: 11.5, marginTop: 6 }}>{pushError}</p>}
 
       {showVisitors && <VisitorsModal onClose={() => setShowVisitors(false)} />}
-      {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
+      {showLikesReceived && (
+        <LikesReceivedModal
+          onClose={() => setShowLikesReceived(false)}
+          onUpgrade={() => { setShowLikesReceived(false); setShowSubscriptions(true); }}
+        />
+      )}
+      {showStats && (
+        <StatsModal
+          onClose={() => setShowStats(false)}
+          onUpgrade={() => { setShowStats(false); setShowSubscriptions(true); }}
+        />
+      )}
+      {showWallet && <WalletModal plan={userPlan} onClose={() => setShowWallet(false)} />}
       {showSubscriptions && <SubscriptionsModal currentPlan={userPlan} onClose={() => setShowSubscriptions(false)} onSubscribed={(p) => setUserPlan(p)} />}
       {showMonetizedContent && <MonetizedContentScreen currentUserId={user?.id} onBack={() => setShowMonetizedContent(false)} />}
       {showMatchmaking && <MatchmakingScreen onBack={() => setShowMatchmaking(false)} onOpenChat={onOpenChat} />}
