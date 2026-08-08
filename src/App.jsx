@@ -830,7 +830,12 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
     setTimeout(() => setToast(""), 2500);
   };
 
+  // Empêche un double-clic rapide (avant le prochain rendu) de déclencher deux appels /api/swipe
+  // pour la même carte — surtout critique pour le Super Like, qui débite des Coins à chaque appel.
+  const swipingRef = useRef(false);
+
   const swipe = useCallback(async (dir) => {
+    if (swipingRef.current) return;
     const current = deck[0];
     if (!current) return;
 
@@ -848,6 +853,7 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
       return;
     }
 
+    swipingRef.current = true;
     setDeck((d) => d.slice(1));
     setLastSwiped({ profile: current, action: dir });
 
@@ -891,10 +897,15 @@ function DiscoverScreen({ onNewMatch, userId, onOpenChat }) {
         if (dir === "superlike") setCoins((c) => (c == null ? c : Math.max(0, c - 10)));
       } catch {
         // Silencieux : en cas de coupure réseau, le swipe reste local pour ne pas bloquer l'utilisateur.
+      } finally {
+        swipingRef.current = false;
       }
-    } else if (dir === "like" && Math.random() > 0.4) {
-      // Mode démo : on simule un match aléatoire.
-      onNewMatch(current);
+    } else {
+      if (dir === "like" && Math.random() > 0.4) {
+        // Mode démo : on simule un match aléatoire.
+        onNewMatch(current);
+      }
+      swipingRef.current = false;
     }
   }, [deck, onNewMatch, limits, coins]);
 
@@ -2866,7 +2877,7 @@ const SUBSCRIPTION_PLAN_STYLE = {
 const FALLBACK_PLANS = {
   gold: {
     name: "Pack Gold", priceUSD: 5, priceXAF: 3000,
-    features: ["Likes illimités (plus de limite quotidienne)", "Badge Gold sur le profil", "Publication de contenu privé (avec vérification d'identité)", "-10% sur l'achat de Lovinia Coins", "Support client prioritaire"],
+    features: ["Likes illimités (plus de limite quotidienne)", "Badge Gold sur le profil", "-10% sur l'achat de Lovinia Coins", "Support client prioritaire"],
   },
   premium: {
     name: "Pack Premium", priceUSD: 10, priceXAF: 6000,
@@ -5628,7 +5639,10 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
         const res = await fetch(`${API_BASE}/api/auth/google`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential }),
+          // acceptedTerms : le consentement est affiché en clair sous le bouton Google à l'écran
+          // d'inscription (voir le texte + liens juste en dessous) ; seul un compte NOUVEAU en a
+          // besoin côté backend, une reconnexion Google d'un compte existant l'ignore simplement.
+          body: JSON.stringify({ credential, acceptedTerms: true }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Connexion Google impossible.");
@@ -5737,6 +5751,12 @@ function AuthScreen({ onAuth, onBackToOnboarding }) {
             <p style={{ color: "#F2B84B", fontFamily: "Manrope, sans-serif", fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Créons ton compte</p>
 
             <GoogleSignInButton onGoogleAuth={handleGoogleAuth} disabled={loading} />
+            <p style={{ textAlign: "center", color: "#6B5A73", fontSize: 10.5, marginTop: 8, lineHeight: 1.4 }}>
+              En continuant avec Google, tu acceptes nos{" "}
+              <span onClick={() => openLegalPage("terms")} style={{ color: "#F2B84B", textDecoration: "underline", cursor: "pointer" }}>Conditions d'utilisation</span>
+              {" "}et notre{" "}
+              <span onClick={() => openLegalPage("privacy")} style={{ color: "#F2B84B", textDecoration: "underline", cursor: "pointer" }}>Politique de confidentialité</span>.
+            </p>
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
               <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
               <span style={{ color: "#6B5A73", fontSize: 12 }}>ou avec ton email</span>
